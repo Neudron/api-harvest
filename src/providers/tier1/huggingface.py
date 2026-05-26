@@ -15,3 +15,4 @@ class HuggingFaceProvider(BaseProvider):
     credits = "$0.10/month in credits"
     rate_limits = "$0.10/month credit cap"
     gotchas = "Very modest credits. Models must be under 10GB for serverless inference."
+    google_oauth = True

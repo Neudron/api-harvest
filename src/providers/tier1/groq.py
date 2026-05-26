@@ -18,3 +18,4 @@ class GroqProvider(BaseProvider):
     credits = "Permanent free tier"
     rate_limits = "30 RPM, 6K-70K tok/min, 1,000-14,400 RPD"
     gotchas = "Rate limits vary per model. No batch API on free tier."
+    google_oauth = True

@@ -20,3 +20,4 @@ class OpenRouterProvider(BaseProvider):
     credits = "Permanent free tier (free models only)"
     rate_limits = "20 RPM, 50 RPD (unfunded); 1,000 RPD with $10 lifetime topup"
     gotchas = "Only ':free' suffix models are free. 50 RPD unfunded is very restrictive."
+    google_oauth = True

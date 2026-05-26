@@ -22,3 +22,4 @@ class CloudflareProvider(BaseProvider):
     credits = "Permanent free tier"
     rate_limits = "10,000 neurons/day"
     gotchas = "Neuron-based pricing — larger models consume more neurons. 10K/day may not go far."
+    google_oauth = True

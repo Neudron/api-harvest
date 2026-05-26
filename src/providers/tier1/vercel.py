@@ -15,3 +15,4 @@ class VercelProvider(BaseProvider):
     credits = "$5/month recurring credits (resets monthly)"
     rate_limits = "$5/month credit cap"
     gotchas = "Some users report credits disappear after adding payment method. ZDR costs extra."
+    google_oauth = True
