@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "api-harvest"
+version = "0.1.0"
+description = "Feature-rich CLI that auto-signs up for AI API providers and harvests free API keys"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "playwright>=1.49.0",
+    "typer>=0.15.0",
+    "rich>=13.9.0",
+    "prompt-toolkit>=3.0.50",
+    "google-genai>=0.3.0",
+    "pydantic>=2.10.0",
+    "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+]
+
+[project.scripts]
+harvest = "harvest.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["harvest"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
+ignore = ["E501", "ASYNC109", "ASYNC240"]  # "timeout" param is Playwright's, not asyncio's; we don't use trio/anyio.path
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
