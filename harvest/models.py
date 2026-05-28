@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Literal
+
+
+def _iso_now() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass(frozen=True)
@@ -63,13 +67,24 @@ class HarvestResult:
 
     @classmethod
     def from_dict(cls, data: dict) -> HarvestResult:
-        return cls(**{k: data.get(k) for k in cls.__dataclass_fields__})
+        # Fall back to sensible defaults for required fields so older or partial
+        # state.json entries don't crash the whole load.
+        defaults = {
+            "provider_slug": data.get("provider_slug") or "unknown",
+            "provider_name": data.get("provider_name") or data.get("provider_slug") or "Unknown",
+            "tier": data.get("tier") or 0,
+            "status": data.get("status") or "failed",
+        }
+        kwargs = {}
+        for k in cls.__dataclass_fields__:
+            kwargs[k] = data.get(k, defaults.get(k))
+        return cls(**kwargs)
 
 
 @dataclass
 class RunState:
     schema_version: int = 1
-    started_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    started_at: str = field(default_factory=_iso_now)
     results: dict[str, HarvestResult] = field(default_factory=dict)
     ai_budget_used: int = 0
 
@@ -83,11 +98,18 @@ class RunState:
 
     @classmethod
     def from_dict(cls, data: dict) -> RunState:
+        results: dict[str, HarvestResult] = {}
+        for k, v in data.get("results", {}).items():
+            try:
+                results[k] = HarvestResult.from_dict(v)
+            except Exception:
+                # Drop malformed entries instead of crashing the whole load.
+                continue
         return cls(
             schema_version=data.get("schema_version", 1),
-            started_at=data.get("started_at", datetime.utcnow().isoformat()),
+            started_at=data.get("started_at", _iso_now()),
             ai_budget_used=data.get("ai_budget_used", 0),
-            results={k: HarvestResult.from_dict(v) for k, v in data.get("results", {}).items()},
+            results=results,
         )
 
 
@@ -112,4 +134,4 @@ class StepEvent:
     kind: EventKind
     message: str = ""
     payload: dict = field(default_factory=dict)
-    ts: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    ts: str = field(default_factory=_iso_now)

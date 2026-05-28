@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -79,7 +80,7 @@ class Handler:
 
     async def screenshot(self, page, label: str) -> Path:
         SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-        ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         path = SCREENSHOTS_DIR / f"{self.spec.slug}-{label}-{ts}.png"
         try:
             await page.screenshot(path=str(path), full_page=False)
@@ -89,7 +90,7 @@ class Handler:
 
     async def capture_dom(self, page, around: str | None = None) -> tuple[str, Path]:
         HTML_DIR.mkdir(parents=True, exist_ok=True)
-        ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         path = HTML_DIR / f"{self.spec.slug}-{ts}.html"
         try:
             content = await page.content()
@@ -210,6 +211,8 @@ class Handler:
         failed_selector: str,
         step_id: str,
     ) -> str | None:
+        # Short-circuit BEFORE doing screenshot/DOM work — saves disk and bandwidth
+        # for the first provider (Google AI Studio runs with ai=None).
         if self.ai is None:
             return None
         try:
@@ -230,6 +233,10 @@ class Handler:
         except Exception as e:
             await self.log(f"ai rescue failed: {e}")
             return None
+        # Don't waste a click on the same selector that just failed.
+        if suggestion.playwright_selector.strip() == failed_selector.strip():
+            await self.log("ai suggested the same selector that failed; skipping retry")
+            return None
         await self.bus.emit(
             StepEvent(
                 provider_slug=self.spec.slug,
@@ -246,71 +253,113 @@ class Handler:
         self,
         page,
         *,
-        click_action,  # async callable
-        timeout_ms: int = 10_000,
+        click_action,  # async callable that triggers the modal
+        timeout_ms: int = 15_000,
     ) -> str:
-        """Install a MutationObserver, run click_action, await key text."""
-        await page.evaluate(
+        """Run `click_action`, then watch for an element whose text matches
+        `self.key_pattern`. The observer attaches AFTER the click so pre-existing
+        DOM nodes (search inputs, request IDs) can't resolve us with stale data.
+
+        If `self.key_pattern` is None we fall back to a permissive 20-char
+        heuristic but still skip elements that look like search inputs.
+        """
+        pattern_source = self.key_pattern.pattern if self.key_pattern else None
+        params = {
+            "pattern": pattern_source,
+            "timeout": timeout_ms,
+        }
+
+        await click_action()
+
+        # Observer installed AFTER the click. The click is what opens the modal
+        # in every flow we know about, so the matching node is necessarily a
+        # post-click addition.
+        text = await page.evaluate(
             """
-            () => {
-              window.__harvestKeyCapture = new Promise((resolve) => {
-                const matches = (el) => {
-                  if (!el || el.nodeType !== 1) return false;
-                  const tag = el.tagName.toLowerCase();
-                  if (tag === 'input' && el.readOnly) return true;
-                  if (tag === 'code' || tag === 'pre') return true;
-                  const t = (el.getAttribute('data-testid') || '').toLowerCase();
-                  if (t.includes('api-key') || t.includes('key')) return true;
-                  const c = (el.className && el.className.toString().toLowerCase()) || '';
-                  if (c.includes('api-key') || c.includes('apikey')) return true;
-                  return false;
-                };
-                const extract = (el) => {
-                  if (!el) return '';
-                  if (el.value) return el.value;
-                  return (el.textContent || '').trim();
-                };
-                // Check existing DOM first
-                const existing = Array.from(document.querySelectorAll('input[readonly], code, pre, [data-testid*="key" i]'));
-                for (const el of existing) {
-                  if (matches(el)) {
-                    const v = extract(el);
-                    if (v && v.length >= 10) { resolve(v); return; }
+            (params) => new Promise((resolve) => {
+              const re = params.pattern ? new RegExp(params.pattern) : null;
+              const minLen = re ? 0 : 20;
+              const candidateSelector =
+                'input[readonly], code, pre, '
+                + '[data-testid*="api-key" i], [data-testid*="apikey" i], '
+                + '[data-testid*="token" i], [class*="api-key" i]';
+
+              const valueOf = (el) => {
+                if (!el) return '';
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return el.value || '';
+                return (el.textContent || '').trim();
+              };
+              const looksLikeSearch = (el) => {
+                if (!el || !el.attributes) return false;
+                const t = (el.getAttribute('type') || '').toLowerCase();
+                const ph = (el.getAttribute('placeholder') || '').toLowerCase();
+                const nm = (el.getAttribute('name') || '').toLowerCase();
+                return t === 'search' || ph.includes('search') || nm.includes('search');
+              };
+              const accept = (el) => {
+                if (!el || el.nodeType !== 1) return null;
+                if (looksLikeSearch(el)) return null;
+                const v = valueOf(el);
+                if (!v || v.length < minLen) return null;
+                if (re && !re.test(v)) return null;
+                return re ? (v.match(re) || [v])[0] : v;
+              };
+              const scan = (root) => {
+                if (!root || !root.querySelectorAll) return null;
+                if (root.matches && root.matches(candidateSelector)) {
+                  const hit = accept(root);
+                  if (hit) return hit;
+                }
+                for (const el of root.querySelectorAll(candidateSelector)) {
+                  const hit = accept(el);
+                  if (hit) return hit;
+                }
+                return null;
+              };
+
+              // First pass: scan the current DOM (post-click).
+              const initial = scan(document.body);
+              if (initial) { resolve(initial); return; }
+
+              // Then watch for the modal to appear.
+              const obs = new MutationObserver((muts) => {
+                for (const m of muts) {
+                  for (const node of m.addedNodes) {
+                    const hit = scan(node);
+                    if (hit) { obs.disconnect(); resolve(hit); return; }
+                  }
+                  // Also catch in-place value mutations (input.value updates)
+                  if (m.type === 'attributes' && m.target) {
+                    const hit = accept(m.target);
+                    if (hit) { obs.disconnect(); resolve(hit); return; }
                   }
                 }
-                const obs = new MutationObserver((muts) => {
-                  for (const m of muts) {
-                    for (const node of m.addedNodes) {
-                      if (matches(node)) {
-                        const v = extract(node);
-                        if (v && v.length >= 10) { obs.disconnect(); resolve(v); return; }
-                      }
-                      if (node.querySelectorAll) {
-                        for (const child of node.querySelectorAll('*')) {
-                          if (matches(child)) {
-                            const v = extract(child);
-                            if (v && v.length >= 10) { obs.disconnect(); resolve(v); return; }
-                          }
-                        }
-                      }
-                    }
-                  }
-                });
-                obs.observe(document.body, { childList: true, subtree: true });
-                setTimeout(() => { obs.disconnect(); resolve(''); }, %d);
               });
-            }
-            """ % timeout_ms  # noqa: UP031 — JS body has braces, %-format keeps it readable
+              obs.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['value'],
+              });
+              setTimeout(() => { obs.disconnect(); resolve(''); }, params.timeout);
+            })
+            """,
+            params,
         )
-        await click_action()
-        text = await page.evaluate("() => window.__harvestKeyCapture")
+
         if not text:
             return ""
+        text = str(text).strip()
         if self.key_pattern:
             m = self.key_pattern.search(text)
-            if m:
-                return m.group(0)
-        return text.strip()
+            return m.group(0) if m else ""
+        return text
+
+    def _safe_json(self, value) -> str:
+        try:
+            return json.dumps(value)
+        except Exception:
+            return "null"
 
     # ---- recipe entrypoints to override ----
 

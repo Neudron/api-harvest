@@ -96,6 +96,14 @@ class InteractiveManager:
         finally:
             await self._resume()
 
+    async def prompt_value(self, label: str) -> str:
+        """Read a free-form string from the user, pausing the dashboard around it."""
+        await self._pause()
+        try:
+            return await _async_prompt(f"{label}> ")
+        finally:
+            await self._resume()
+
 
 async def block_until_enter(prompt: str = "Press Enter to continue... ") -> None:
     """Used by tests / no-dashboard mode."""

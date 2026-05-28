@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from harvest.handlers import register
 from harvest.handlers.base import Handler, HandlerError, RequiresManualLogin
@@ -44,7 +44,7 @@ class GithubModelsHandler(Handler):
             # Fill token name
             try:
                 await page.locator("input[name='user_programmatic_access[name]']").fill(
-                    f"api-harvest-models-{datetime.utcnow().strftime('%Y%m%d')}",
+                    f"api-harvest-models-{datetime.now(UTC).strftime('%Y%m%d')}",
                     timeout=3_000,
                 )
             except Exception:
@@ -84,7 +84,7 @@ class GithubModelsHandler(Handler):
                             status="done",
                             api_key=m.group(0),
                             env_var=self.spec.env_var,
-                            created_at=datetime.utcnow().isoformat(),
+                            created_at=datetime.now(UTC).isoformat(),
                             dashboard_url=self.spec.api_key_url,
                             rate_limits=self.spec.rate_limits,
                         )

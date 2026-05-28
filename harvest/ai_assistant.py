@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -59,7 +59,7 @@ class AIAssistant:
             raise AIBudgetExhausted(f"per-step AI budget {step.limit} exhausted for {step_id}")
 
     def _log(self, payload: dict) -> None:
-        payload["ts"] = datetime.utcnow().isoformat()
+        payload["ts"] = datetime.now(UTC).isoformat()
         with self._log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(payload) + "\n")
 
@@ -96,26 +96,36 @@ class AIAssistant:
                 genai_types.Part.from_bytes(data=screenshot_png, mime_type="image/png")
             )
 
-        try:
-            response = await self._client.aio.models.generate_content(
+        async def _gen(schema):
+            return await self._client.aio.models.generate_content(
                 model=self._model,
                 contents=contents,
                 config=genai_types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_schema=SelectorSuggestion,
+                    response_schema=schema,
                 ),
             )
-        except Exception as e:
-            self._log(
-                {
-                    "step_id": step_id,
-                    "provider": provider_name,
-                    "goal": goal,
-                    "failed_selector": failed_selector,
-                    "error": str(e),
-                }
-            )
-            raise
+
+        try:
+            # Preferred: pass the Pydantic model class directly (google-genai
+            # 2.x supports this via internal coercion).
+            response = await _gen(SelectorSuggestion)
+        except Exception:
+            # Fall back to an explicit JSON Schema dict if the SDK in use
+            # doesn't accept the BaseModel form.
+            try:
+                response = await _gen(SelectorSuggestion.model_json_schema())
+            except Exception as e:
+                self._log(
+                    {
+                        "step_id": step_id,
+                        "provider": provider_name,
+                        "goal": goal,
+                        "failed_selector": failed_selector,
+                        "error": str(e),
+                    }
+                )
+                raise
 
         self._run_used += 1
         self._step_budget(step_id).used += 1

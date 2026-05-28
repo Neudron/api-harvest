@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 
 from harvest.handlers import register
 from harvest.handlers.base import Handler, HandlerError, RequiresManualLogin
@@ -102,7 +102,7 @@ class GoogleAiStudioHandler(Handler):
                 status="done",
                 api_key=key,
                 env_var=self.spec.env_var,
-                created_at=datetime.utcnow().isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 dashboard_url=self.spec.api_key_url,
                 rate_limits=self.spec.rate_limits,
             )

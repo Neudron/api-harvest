@@ -134,11 +134,14 @@ class Dashboard:
         try:
             async for event in bus.stream():
                 self._apply(event)
-                if self._live is not None and self.paused.is_set():
+                if self.paused.is_set() and self._live is not None and self._live.is_started:
                     self._refresh()
-                    self._live.refresh()
+                    try:
+                        self._live.refresh()
+                    except Exception:
+                        pass
         finally:
-            if self._live is not None:
+            if self._live is not None and self._live.is_started:
                 self._live.stop()
 
     def _apply(self, event: StepEvent) -> None:
@@ -173,21 +176,24 @@ class Dashboard:
             self.recent.append(f"[ai] {event.message}")
         elif event.kind == EventKind.PROMPT:
             self.recent.append(f"[prompt] {event.message}")
-        elif event.kind == EventKind.DASHBOARD_PAUSE:
-            self.paused.clear()
-            if self._live is not None:
-                self._live.stop()
-        elif event.kind == EventKind.DASHBOARD_RESUME:
-            self.paused.set()
-            if self._live is not None:
-                self._live.start()
+        # DASHBOARD_PAUSE / DASHBOARD_RESUME events are intentionally NOT handled
+        # here. Pause/resume goes through Dashboard.pause()/resume() so there is
+        # exactly one path that touches Live.start/stop.
 
     async def pause(self) -> None:
+        """Called by InteractiveManager before reading from stdin. Idempotent."""
         self.paused.clear()
-        if self._live is not None:
-            self._live.stop()
+        if self._live is not None and self._live.is_started:
+            try:
+                self._live.stop()
+            except Exception:
+                pass
 
     async def resume(self) -> None:
+        """Called by InteractiveManager after stdin read returns. Idempotent."""
         self.paused.set()
-        if self._live is not None:
-            self._live.start()
+        if self._live is not None and not self._live.is_started:
+            try:
+                self._live.start()
+            except Exception:
+                pass

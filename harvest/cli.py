@@ -82,8 +82,17 @@ def export(
     config.ensure_dirs()
     from harvest.output import rerender
 
-    n = rerender(config.JSON_PATH, config.ENV_PATH, config.MD_PATH)
-    console.print(f"Re-rendered outputs from {n} stored results.")
+    fmt = format.lower().strip()
+    if fmt == "all":
+        formats = {"env", "md", "json"}
+    elif fmt in ("env", "md", "json"):
+        formats = {fmt}
+    else:
+        console.print(f"[red]Unknown --format {format!r}; use env|json|md|all[/red]")
+        raise typer.Exit(code=2)
+
+    n = rerender(config.JSON_PATH, config.ENV_PATH, config.MD_PATH, formats=formats)
+    console.print(f"Re-rendered {sorted(formats)} from {n} stored results.")
 
 
 @app.command()
@@ -98,9 +107,14 @@ def run(
     gemini_key: Annotated[str | None, typer.Option("--gemini-key", help="Bootstrap Gemini key (skips AI Studio rescue)")] = None,
 ) -> None:
     """Run the harvest pipeline."""
-    if (cdp_port is None) == (profile_dir is None):
+    if cdp_port is not None and profile_dir is not None:
         console.print(
-            "[red]Provide exactly one of --cdp-port or --profile-dir.[/red]\n"
+            "[red]--cdp-port and --profile-dir are mutually exclusive. Pick one.[/red]"
+        )
+        raise typer.Exit(code=2)
+    if cdp_port is None and profile_dir is None:
+        console.print(
+            "[red]Provide a browser mode:[/red]\n"
             "  --cdp-port 9222            (attach to an existing Chrome started with --remote-debugging-port)\n"
             "  --profile-dir ./harvest-chrome  (use a dedicated Chromium profile)"
         )
@@ -112,18 +126,22 @@ def run(
 
     gemini = gemini_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")
 
-    asyncio.run(
-        _run_async(
-            cdp_port=cdp_port,
-            profile_dir=profile_dir,
-            only_set=only_set,
-            skip_set=skip_set,
-            no_dashboard=no_dashboard,
-            ai_model=ai_model,
-            ai_budget=ai_budget,
-            gemini_key=gemini,
+    try:
+        asyncio.run(
+            _run_async(
+                cdp_port=cdp_port,
+                profile_dir=profile_dir,
+                only_set=only_set,
+                skip_set=skip_set,
+                no_dashboard=no_dashboard,
+                ai_model=ai_model,
+                ai_budget=ai_budget,
+                gemini_key=gemini,
+            )
         )
-    )
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted by user — state has been saved.[/yellow]")
+        raise typer.Exit(code=130) from None
 
 
 async def _run_async(
@@ -140,6 +158,7 @@ async def _run_async(
     from harvest.browser import close_browser, open_browser
     from harvest.dashboard import Dashboard
     from harvest.events import EventBus
+    from harvest.hotkeys import HotkeyState, run_hotkey_listener
     from harvest.interactive import InteractiveManager
     from harvest.orchestrator import RunOptions, run_pipeline
 
@@ -150,12 +169,14 @@ async def _run_async(
     bus = EventBus()
     dashboard = Dashboard(console, specs) if not no_dashboard else None
     interactive = InteractiveManager(dashboard, console)
+    hotkeys = HotkeyState()
 
     handle = await open_browser(cdp_port=cdp_port, profile_dir=profile_dir)
 
     dashboard_task = None
     if dashboard is not None:
         dashboard_task = asyncio.create_task(dashboard.run(bus))
+    hotkey_task = asyncio.create_task(run_hotkey_listener(hotkeys, bus))
 
     options = RunOptions(
         only=only_set,
@@ -163,17 +184,21 @@ async def _run_async(
         ai_model=ai_model,
         ai_budget=ai_budget,
         gemini_api_key=gemini_key,
+        hotkeys=hotkeys,
     )
 
+    interrupted = False
     try:
         await run_pipeline(
             specs=specs,
-            context=handle.context,
+            handle=handle,
             state_store=store,
             bus=bus,
             interactive=interactive,
             options=options,
         )
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        interrupted = True
     finally:
         await bus.close()
         if dashboard_task is not None:
@@ -181,7 +206,15 @@ async def _run_async(
                 await asyncio.wait_for(dashboard_task, timeout=2.0)
             except TimeoutError:
                 dashboard_task.cancel()
+        hotkey_task.cancel()
+        try:
+            await asyncio.wait_for(hotkey_task, timeout=1.0)
+        except (TimeoutError, asyncio.CancelledError):
+            pass
         await close_browser(handle)
+        if interrupted:
+            # Re-raise so the outer typer handler exits 130 with the user message.
+            raise KeyboardInterrupt
 
     # Final summary
     state = store.state

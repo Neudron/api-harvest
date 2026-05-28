@@ -94,12 +94,26 @@ def append_result(result: HarvestResult, *, env_path: Path, json_path: Path, md_
     _atomic_write(md_path, _render_md(results))
 
 
-def rerender(json_path: Path, env_path: Path, md_path: Path) -> int:
+def rerender(
+    json_path: Path,
+    env_path: Path,
+    md_path: Path,
+    *,
+    formats: set[str] | None = None,
+) -> int:
+    """Re-render outputs from keys.json. `formats` is a subset of {'env','md','json'};
+    None means all three. (`json` is a no-op since keys.json is the source.)"""
     results = _read_json(json_path)
-    env: dict[str, str] = {}
-    for r in results:
-        if r.get("api_key") and r.get("env_var"):
-            env[r["env_var"]] = r["api_key"]
-    _write_env(env_path, env)
-    _atomic_write(md_path, _render_md(results))
+    formats = formats or {"env", "md", "json"}
+    if "env" in formats:
+        env: dict[str, str] = {}
+        for r in results:
+            if r.get("api_key") and r.get("env_var"):
+                env[r["env_var"]] = r["api_key"]
+        _write_env(env_path, env)
+    if "md" in formats:
+        _atomic_write(md_path, _render_md(results))
+    # "json" is implicit — keys.json IS the source. Re-sort + write for tidiness.
+    if "json" in formats:
+        _write_json(json_path, results)
     return len(results)

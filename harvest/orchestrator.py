@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import traceback
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from harvest import config
+from harvest.browser import BrowserHandle, new_page
 from harvest.events import EventBus
 from harvest.handlers import HANDLER_REGISTRY
 from harvest.handlers.recipes import GoogleSsoCreateKeyRecipe
@@ -24,6 +27,7 @@ class RunOptions:
     ai_model: str = config.DEFAULT_AI_MODEL
     ai_budget: int = config.DEFAULT_AI_BUDGET_PER_RUN
     gemini_api_key: str | None = None
+    hotkeys: object | None = None  # HotkeyState or None
 
 
 def _build_handler(spec: ProviderSpec, ai: AIAssistant | None, interactive: InteractiveManager, bus: EventBus):
@@ -37,7 +41,7 @@ def _build_handler(spec: ProviderSpec, ai: AIAssistant | None, interactive: Inte
 async def run_pipeline(
     *,
     specs: list[ProviderSpec],
-    context,
+    handle: BrowserHandle,
     state_store: StateStore,
     bus: EventBus,
     interactive: InteractiveManager,
@@ -56,6 +60,30 @@ async def run_pipeline(
         )
 
     for spec in specs:
+        hk = options.hotkeys
+        if hk is not None and getattr(hk, "quit_requested", False):
+            await bus.emit(
+                StepEvent(provider_slug=spec.slug, kind=EventKind.LOG, message="quit hotkey received")
+            )
+            break
+        if hk is not None and getattr(hk, "skip_requested", False):
+            # Consume the request and skip this single provider.
+            hk.skip_requested = False
+            result = HarvestResult(
+                provider_slug=spec.slug,
+                provider_name=spec.name,
+                tier=spec.tier,
+                status="skipped",
+                env_var=spec.env_var,
+                dashboard_url=spec.api_key_url,
+                rate_limits=spec.rate_limits,
+                user_skipped=True,
+                notes="skipped via hotkey",
+            )
+            state_store.mark(result)
+            append_result(result, env_path=config.ENV_PATH, json_path=config.JSON_PATH, md_path=config.MD_PATH)
+            await bus.emit(StepEvent(provider_slug=spec.slug, kind=EventKind.SKIP, message="hotkey"))
+            continue
         if options.only and spec.slug not in options.only:
             continue
         if options.skip and spec.slug in options.skip:
@@ -95,14 +123,48 @@ async def run_pipeline(
                 await bus.emit(StepEvent(provider_slug=spec.slug, kind=EventKind.SKIP, message="CC declined"))
                 continue
 
-        page = await context.new_page()
+        page = await new_page(handle)
         try:
             handler = _build_handler(spec, ai, interactive, bus)
             try:
                 result = await handler.run(page)
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, KeyboardInterrupt):
+                # Mark the in-flight provider as user_skipped so it isn't retried
+                # on the next run, then re-raise so the caller can clean up.
+                result = HarvestResult(
+                    provider_slug=spec.slug,
+                    provider_name=spec.name,
+                    tier=spec.tier,
+                    status="skipped",
+                    env_var=spec.env_var,
+                    dashboard_url=spec.api_key_url,
+                    rate_limits=spec.rate_limits,
+                    user_skipped=True,
+                    notes="interrupted (Ctrl+C)",
+                )
+                state_store.mark(result)
+                append_result(
+                    result,
+                    env_path=config.ENV_PATH,
+                    json_path=config.JSON_PATH,
+                    md_path=config.MD_PATH,
+                )
                 raise
             except Exception as e:
+                # Write the full traceback to disk so debugging doesn't depend
+                # on whatever truncated string we put in result.error.
+                err_dir = config.RUNTIME_DIR / "errors"
+                err_dir.mkdir(parents=True, exist_ok=True)
+                ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+                err_path = err_dir / f"{spec.slug}-{ts}.log"
+                try:
+                    err_path.write_text(
+                        f"Provider: {spec.slug}\nException: {type(e).__name__}: {e}\n\n"
+                        + traceback.format_exc(),
+                        encoding="utf-8",
+                    )
+                except Exception:
+                    pass
                 result = HarvestResult(
                     provider_slug=spec.slug,
                     provider_name=spec.name,
@@ -111,15 +173,20 @@ async def run_pipeline(
                     env_var=spec.env_var,
                     dashboard_url=spec.api_key_url,
                     rate_limits=spec.rate_limits,
-                    error=f"unexpected: {type(e).__name__}: {e}",
+                    error=f"{type(e).__name__}: {e} (traceback: {err_path})",
                 )
         finally:
             try:
+                if handle.is_cdp and page in handle.owned_pages:
+                    handle.owned_pages.remove(page)
                 await page.close()
             except Exception:
                 pass
 
         state_store.mark(result)
+        if ai is not None:
+            state_store.state.ai_budget_used = ai.run_used
+            state_store.save()
         append_result(
             result,
             env_path=config.ENV_PATH,
