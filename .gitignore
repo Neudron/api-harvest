@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# api-harvest runtime
+.harvest/
+outputs/
+
