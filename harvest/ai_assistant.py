@@ -1,3 +1,5 @@
+"""AI-powered selector rescue with budget tracking and audit logging."""
+
 from __future__ import annotations
 
 import json
@@ -5,40 +7,42 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from harvest.ai.base import LLMBackend, SelectorSuggestion
 
 
 class AIBudgetExhausted(Exception):
+    """Raised when AI budget is exhausted."""
+
     pass
-
-
-class SelectorSuggestion(BaseModel):
-    playwright_selector: str = Field(..., description="A Playwright-compatible selector")
-    reason: str = Field(default="", description="Brief explanation of why this selector should work")
-    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 @dataclass
 class _StepBudget:
+    """Tracks AI calls per step."""
+
     used: int = 0
     limit: int = 2
 
 
 class AIAssistant:
-    """Wraps google-genai for selector rescue. Strict budget + audit log."""
+    """Wraps an LLMBackend with budget enforcement and audit logging."""
 
     def __init__(
         self,
-        api_key: str,
+        backend: LLMBackend,
         log_path: Path,
-        model: str = "gemini-2.5-flash",
         per_run_budget: int = 30,
         per_step_budget: int = 2,
     ):
-        from google import genai
+        """Initialize AIAssistant.
 
-        self._client = genai.Client(api_key=api_key)
-        self._model = model
+        Args:
+            backend: LLMBackend implementation (Gemini, Anthropic, fake, null, etc).
+            log_path: Path to audit log (JSONL).
+            per_run_budget: Max AI calls per run.
+            per_step_budget: Max AI calls per step.
+        """
+        self._backend = backend
         self._per_run_budget = per_run_budget
         self._per_step_budget = per_step_budget
         self._run_used = 0
@@ -64,8 +68,6 @@ class AIAssistant:
         payload["ts"] = datetime.now(UTC).isoformat()
         with self._log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(payload) + "\n")
-        # The audit log records prompts/suggestions but not keys; still keep it
-        # owner-only since it lives alongside the secrets in .harvest/.
         secure_chmod(self._log_path)
 
     async def rescue_selector(
@@ -79,72 +81,32 @@ class AIAssistant:
         html_snippet: str,
         screenshot_png: bytes | None = None,
     ) -> SelectorSuggestion:
-        from google.genai import types as genai_types
-
+        """Use backend to suggest a selector, enforcing budgets and logging."""
         self._check_budget(step_id)
 
-        prompt = (
-            "You are a Playwright selector assistant. A Playwright selector failed.\n"
-            "Return ONLY JSON matching this schema: "
-            '{"playwright_selector": "<selector>", "reason": "<why>", "confidence": <0..1>}.\n'
-            "Prefer text-based selectors when possible (e.g. role=button[name=...] or text=...).\n\n"
-            f"Provider: {provider_name}\n"
-            f"URL: {url}\n"
-            f"Goal: {goal}\n"
-            f"Failed selector: {failed_selector}\n\n"
-            f"DOM snippet (trimmed):\n```html\n{html_snippet[:8000]}\n```\n"
-        )
-
-        contents: list = [prompt]
-        if screenshot_png:
-            contents.append(
-                genai_types.Part.from_bytes(data=screenshot_png, mime_type="image/png")
-            )
-
-        async def _gen(schema):
-            return await self._client.aio.models.generate_content(
-                model=self._model,
-                contents=contents,
-                config=genai_types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=schema,
-                ),
-            )
-
         try:
-            # Preferred: pass the Pydantic model class directly (google-genai
-            # 2.x supports this via internal coercion).
-            response = await _gen(SelectorSuggestion)
-        except Exception:
-            # Fall back to an explicit JSON Schema dict if the SDK in use
-            # doesn't accept the BaseModel form.
-            try:
-                response = await _gen(SelectorSuggestion.model_json_schema())
-            except Exception as e:
-                self._log(
-                    {
-                        "step_id": step_id,
-                        "provider": provider_name,
-                        "goal": goal,
-                        "failed_selector": failed_selector,
-                        "error": str(e),
-                    }
-                )
-                raise
+            parsed = await self._backend.suggest_selector(
+                provider_name=provider_name,
+                goal=goal,
+                failed_selector=failed_selector,
+                url=url,
+                html_snippet=html_snippet,
+                screenshot_png=screenshot_png,
+            )
+        except Exception as e:
+            self._log(
+                {
+                    "step_id": step_id,
+                    "provider": provider_name,
+                    "goal": goal,
+                    "failed_selector": failed_selector,
+                    "error": str(e),
+                }
+            )
+            raise
 
         self._run_used += 1
         self._step_budget(step_id).used += 1
-
-        text = response.text or "{}"
-        try:
-            parsed = SelectorSuggestion.model_validate_json(text)
-        except Exception:
-            data = json.loads(text) if text.strip() else {}
-            parsed = SelectorSuggestion(
-                playwright_selector=data.get("playwright_selector", ""),
-                reason=data.get("reason", ""),
-                confidence=float(data.get("confidence", 0.0)),
-            )
 
         self._log(
             {

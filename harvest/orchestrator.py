@@ -50,12 +50,13 @@ async def run_pipeline(
     """Sequentially run providers. Google AI Studio first; on success bootstrap AIAssistant."""
     ai: AIAssistant | None = None
     if options.gemini_api_key:
+        from harvest.ai import GeminiBackend
         from harvest.ai_assistant import AIAssistant
 
+        backend = GeminiBackend(api_key=options.gemini_api_key, model=options.ai_model)
         ai = AIAssistant(
-            api_key=options.gemini_api_key,
+            backend=backend,
             log_path=config.AI_LOG_PATH,
-            model=options.ai_model,
             per_run_budget=options.ai_budget,
         )
 
@@ -205,12 +206,13 @@ async def run_pipeline(
             )
             # Bootstrap AI assistant after Google AI Studio succeeds
             if spec.slug == "google-gemini-ai-studio" and ai is None and result.api_key:
+                from harvest.ai import GeminiBackend
                 from harvest.ai_assistant import AIAssistant
 
+                backend = GeminiBackend(api_key=result.api_key, model=options.ai_model)
                 ai = AIAssistant(
-                    api_key=result.api_key,
+                    backend=backend,
                     log_path=config.AI_LOG_PATH,
-                    model=options.ai_model,
                     per_run_budget=options.ai_budget,
                 )
                 await bus.emit(
