@@ -72,7 +72,7 @@ def test_pause_resume_events_are_ignored_in_apply() -> None:
     """Pause/resume should NOT touch Live from _apply (only the public methods do).
     Regression test for the Wave 1 fix."""
     d = _dash()
-    # Before the fix, the next line would call self._live.stop() on None — but
-    # we want it to be a no-op. The test is that nothing raises.
+    # Before the fix, the next line would call self._live.stop() on None.
+    # Now it's a no-op, and the test is just that nothing raises.
     d._apply(StepEvent(provider_slug="", kind=EventKind.DASHBOARD_PAUSE))
     d._apply(StepEvent(provider_slug="", kind=EventKind.DASHBOARD_RESUME))

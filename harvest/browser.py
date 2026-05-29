@@ -71,7 +71,7 @@ async def close_browser(handle: BrowserHandle) -> None:
     try:
         if handle.is_cdp and handle.browser is not None:
             # CDP attach: close only pages we created, never touch the browser
-            # or the user's pre-existing context — stopping Playwright tears down
+            # or the user's pre-existing context. Stopping Playwright tears down
             # the websocket cleanly without telling Chrome to exit.
             for page in handle.owned_pages:
                 try:

@@ -45,7 +45,7 @@ class InteractiveManager:
     async def ask_sms_code(self, provider_name: str, phone_hint: str | None = None) -> str:
         await self._pause()
         try:
-            self.console.rule(f"[yellow]SMS verification — {provider_name}[/yellow]")
+            self.console.rule(f"[yellow]SMS verification: {provider_name}[/yellow]")
             if phone_hint:
                 self.console.print(f"  phone hint: {phone_hint}")
             self.console.print("  Enter the SMS code you received, then press Enter.")
@@ -57,7 +57,7 @@ class InteractiveManager:
     async def pause_for_cc(self, provider_name: str, why: str) -> Literal["resume", "skip"]:
         await self._pause()
         try:
-            self.console.rule(f"[red]Credit card required — {provider_name}[/red]")
+            self.console.rule(f"[red]Credit card required: {provider_name}[/red]")
             self.console.print(f"  {why}")
             self.console.print("  [r]esume after entering CC in the browser, or [s]kip this provider.")
             while True:
@@ -74,7 +74,7 @@ class InteractiveManager:
     ) -> Literal["resume", "skip", "abort"]:
         await self._pause()
         try:
-            self.console.rule(f"[magenta]Manual takeover — {provider_name}[/magenta]")
+            self.console.rule(f"[magenta]Manual takeover: {provider_name}[/magenta]")
             self.console.print(f"  {message}")
             self.console.print("  [r]esume   [s]kip provider   [q]uit run")
             while True:

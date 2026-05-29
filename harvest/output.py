@@ -113,7 +113,7 @@ def rerender(
         _write_env(env_path, env)
     if "md" in formats:
         _atomic_write(md_path, _render_md(results))
-    # "json" is implicit — keys.json IS the source. Re-sort + write for tidiness.
+    # "json" is implicit since keys.json IS the source. Re-sort and write for tidiness.
     if "json" in formats:
         _write_json(json_path, results)
     return len(results)
