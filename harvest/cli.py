@@ -15,7 +15,7 @@ from harvest.state import StateStore
 
 app = typer.Typer(
     add_completion=False,
-    help="api-harvest — automate signup at AI providers and harvest API keys.",
+    help="api-harvest: automate signup at AI providers and harvest API keys.",
 )
 console = Console()
 
@@ -140,7 +140,7 @@ def run(
             )
         )
     except KeyboardInterrupt:
-        console.print("\n[yellow]Interrupted by user — state has been saved.[/yellow]")
+        console.print("\n[yellow]Interrupted by user. State has been saved.[/yellow]")
         raise typer.Exit(code=130) from None
 
 

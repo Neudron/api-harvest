@@ -1,5 +1,5 @@
-"""CLI surface tests via typer's CliRunner. Validates plumbing — not browser
-behavior — so these run offline without a real Chrome.
+"""CLI surface tests via typer's CliRunner. These check plumbing, not browser
+behavior, so they run offline without a real Chrome.
 """
 
 from __future__ import annotations
@@ -79,4 +79,4 @@ def test_export_honors_md_only(tmp_path: Path, monkeypatch) -> None:
     result = runner.invoke(app, ["export", "--format", "md"])
     assert result.exit_code == 0, result.stdout
     assert (tmp_path / "keys.md").exists()
-    assert not (tmp_path / ".env").exists()  # md only — env was not requested
+    assert not (tmp_path / ".env").exists()  # md only, so env was not requested
