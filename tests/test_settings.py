@@ -104,8 +104,10 @@ def test_load_settings_respects_harvest_config_env() -> None:
 
 def test_load_settings_is_immutable() -> None:
     """Settings objects are frozen and cannot be modified."""
+    from pydantic import ValidationError
+
     settings = Settings()
-    with pytest.raises(Exception):  # FrozenInstanceError from Pydantic
+    with pytest.raises((ValidationError, AttributeError)):
         settings.ai_model = "modified"  # type: ignore
 
 

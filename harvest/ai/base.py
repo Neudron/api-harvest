@@ -5,7 +5,7 @@ Provides a pluggable interface for different LLM providers (Gemini, OpenAI, Anth
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncIterator, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import BaseModel, Field
 
