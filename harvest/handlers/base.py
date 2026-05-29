@@ -211,7 +211,7 @@ class Handler:
         failed_selector: str,
         step_id: str,
     ) -> str | None:
-        # Short-circuit BEFORE doing screenshot/DOM work — saves disk and bandwidth
+        # Short-circuit before doing screenshot/DOM work. Saves disk and bandwidth
         # for the first provider (Google AI Studio runs with ai=None).
         if self.ai is None:
             return None

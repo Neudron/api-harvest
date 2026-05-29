@@ -15,7 +15,7 @@ from harvest.state import StateStore
 
 app = typer.Typer(
     add_completion=False,
-    help="api-harvest — automate signup at AI providers and harvest API keys.",
+    help="api-harvest: automate signup at AI providers and harvest API keys.",
 )
 console = Console()
 
@@ -51,7 +51,7 @@ def status() -> None:
     config.ensure_dirs()
     store = StateStore(config.STATE_PATH)
     state = store.load()
-    table = Table(title=f"state.json — {len(state.results)} entries")
+    table = Table(title=f"state.json: {len(state.results)} entries")
     table.add_column("Slug")
     table.add_column("Status")
     table.add_column("Env Var")
@@ -140,7 +140,7 @@ def run(
             )
         )
     except KeyboardInterrupt:
-        console.print("\n[yellow]Interrupted by user — state has been saved.[/yellow]")
+        console.print("\n[yellow]Interrupted by user. State has been saved.[/yellow]")
         raise typer.Exit(code=130) from None
 
 

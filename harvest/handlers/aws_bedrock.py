@@ -6,7 +6,7 @@ from harvest.handlers.recipes import CloudConsoleRecipe
 class AwsBedrockHandler(CloudConsoleRecipe):
     cc_pause_reason = (
         "AWS requires a credit card and identity verification at signup. "
-        "AWS credentials apply across all AWS services — easy to burn the $200 credits."
+        "AWS credentials apply across all AWS services, so it's easy to burn the $200 credits."
     )
     manual_capture_message = (
         "In IAM → Security credentials, create an Access key for CLI. "

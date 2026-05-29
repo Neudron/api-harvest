@@ -238,7 +238,7 @@ class EmailSignupRecipe(GoogleSsoCreateKeyRecipe):
 
 
 class CloudConsoleRecipe(Handler):
-    """AWS / GCP / Azure — these need a credit card and a complex IAM flow.
+    """AWS, GCP, and Azure need a credit card and a multi-step IAM flow.
     We pause for the user, guide them, then capture whatever credentials they
     paste back into the CLI."""
 
