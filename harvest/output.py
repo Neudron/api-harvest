@@ -7,10 +7,26 @@ from pathlib import Path
 from harvest.models import HarvestResult
 
 
+def secure_chmod(path: Path) -> None:
+    """Best-effort tighten file permissions to owner read/write only (0o600).
+
+    Harvested keys are live secrets, so files like .env / keys.json / state.json
+    must not be world- or group-readable. No-op on platforms (e.g. Windows) where
+    POSIX permissions don't apply.
+    """
+    try:
+        os.chmod(path, 0o600)
+    except (OSError, NotImplementedError):
+        pass
+
+
 def _atomic_write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(content, encoding="utf-8")
+    # Tighten perms on the temp file *before* the rename so there is never a
+    # window where the final secret file is world-readable.
+    secure_chmod(tmp)
     os.replace(tmp, path)
 
 

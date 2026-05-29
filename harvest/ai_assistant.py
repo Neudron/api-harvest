@@ -59,9 +59,14 @@ class AIAssistant:
             raise AIBudgetExhausted(f"per-step AI budget {step.limit} exhausted for {step_id}")
 
     def _log(self, payload: dict) -> None:
+        from harvest.output import secure_chmod
+
         payload["ts"] = datetime.now(UTC).isoformat()
         with self._log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(payload) + "\n")
+        # The audit log records prompts/suggestions but not keys; still keep it
+        # owner-only since it lives alongside the secrets in .harvest/.
+        secure_chmod(self._log_path)
 
     async def rescue_selector(
         self,

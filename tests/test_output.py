@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+import pytest
 
 from harvest.models import HarvestResult
 from harvest.output import append_result, rerender
@@ -109,3 +112,20 @@ def test_rerender_recreates_outputs(tmp_path: Path) -> None:
     assert n == 1
     assert "GROQ_API_KEY=gsk_abc" in env_path.read_text()
     assert "Groq" in md_path.read_text()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permissions only")
+def test_outputs_are_owner_only(tmp_path: Path) -> None:
+    env_path = tmp_path / ".env"
+    json_path = tmp_path / "keys.json"
+    md_path = tmp_path / "keys.md"
+
+    append_result(
+        _result("groq", 1, "gsk_secret", "GROQ_API_KEY"),
+        env_path=env_path,
+        json_path=json_path,
+        md_path=md_path,
+    )
+
+    for p in (env_path, json_path, md_path):
+        assert p.stat().st_mode & 0o777 == 0o600, f"{p} should be owner-only"

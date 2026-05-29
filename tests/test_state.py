@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from harvest.models import HarvestResult
-from harvest.parser import parse_providers_md
-from harvest.state import StateStore, resume_filter
+from harvest.parser import build_run_order, parse_providers_md
+from harvest.state import StateStore, plan_run, resume_filter
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -87,3 +87,39 @@ def test_resume_filter(tmp_path: Path) -> None:
     assert "groq" in handled_slugs
     assert "anthropic" in handled_slugs
     assert "cerebras" in to_run_slugs  # failed → retried
+
+
+def test_plan_run_dispositions(tmp_path: Path) -> None:
+    p = tmp_path / "state.json"
+    store = StateStore(p)
+    store.load()
+    store.mark(HarvestResult(provider_slug="groq", provider_name="Groq", tier=1, status="done"))
+    store.mark(
+        HarvestResult(
+            provider_slug="anthropic",
+            provider_name="Anthropic",
+            tier=2,
+            status="skipped",
+            user_skipped=True,
+        )
+    )
+
+    specs = build_run_order(parse_providers_md(ROOT / "providers.md"))
+    disp = dict((spec.slug, reason) for spec, reason in plan_run(specs, store.state))
+    assert disp["groq"] == "skip (already done)"
+    assert disp["anthropic"] == "skip (user-skipped)"
+    assert disp["cerebras"] == "run"  # untouched → runs
+
+
+def test_plan_run_only_and_skip(tmp_path: Path) -> None:
+    store = StateStore(tmp_path / "state.json")
+    store.load()
+    specs = build_run_order(parse_providers_md(ROOT / "providers.md"))
+
+    only = dict((s.slug, r) for s, r in plan_run(specs, store.state, only={"groq"}))
+    assert only["groq"] == "run"
+    assert only["cerebras"] == "excluded (--only)"
+
+    skipped = dict((s.slug, r) for s, r in plan_run(specs, store.state, skip={"groq"}))
+    assert skipped["groq"] == "excluded (--skip)"
+    assert skipped["cerebras"] == "run"

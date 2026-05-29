@@ -28,6 +28,48 @@ def test_status_command_empty() -> None:
     assert "state.json" in result.stdout
 
 
+def test_version_flag() -> None:
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert "api-harvest" in result.stdout
+
+
+def test_version_command() -> None:
+    result = runner.invoke(app, ["version"])
+    assert result.exit_code == 0
+    assert "api-harvest" in result.stdout
+
+
+def test_doctor_runs() -> None:
+    result = runner.invoke(app, ["doctor"])
+    # Exit code may be 0 or 1 depending on env (e.g. missing Gemini key), but it
+    # must always render the diagnostics table without crashing.
+    assert result.exit_code in (0, 1)
+    assert "doctor" in result.stdout
+    assert "providers catalog parses" in result.stdout
+
+
+def test_complete_slug_matches_prefix() -> None:
+    from harvest.cli import _complete_slug
+
+    assert "groq" in _complete_slug("gr")
+    assert _complete_slug("zzz-no-such") == []
+
+
+def test_run_dry_run_lists_plan(tmp_path: Path, monkeypatch) -> None:
+    from harvest import config
+
+    monkeypatch.setattr(config, "RUNTIME_DIR", tmp_path / ".harvest")
+    monkeypatch.setattr(config, "STATE_PATH", tmp_path / ".harvest" / "state.json")
+    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path / "outputs")
+
+    result = runner.invoke(app, ["run", "--dry-run", "--only", "groq"])
+    assert result.exit_code == 0, result.stdout
+    assert "dry run" in result.stdout.lower()
+    assert "groq" in result.stdout
+    assert "1 of" in result.stdout  # exactly one provider would run
+
+
 def test_run_requires_browser_mode() -> None:
     """Neither --cdp-port nor --profile-dir should error with a tailored message."""
     result = runner.invoke(app, ["run"])
