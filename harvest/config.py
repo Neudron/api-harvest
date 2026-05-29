@@ -1,26 +1,48 @@
+"""Backward-compatible config shim.
+
+This module maintains the old `from harvest import config; config.PROVIDERS_MD` API
+while delegating to the new Settings system. Import `harvest.settings` directly for
+production code.
+"""
+
 from __future__ import annotations
 
-from pathlib import Path
+from harvest.settings import get_settings
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-PROVIDERS_MD = REPO_ROOT / "providers.md"
-RUNTIME_DIR = REPO_ROOT / ".harvest"
-SCREENSHOTS_DIR = RUNTIME_DIR / "screenshots"
-HTML_DIR = RUNTIME_DIR / "html"
-STATE_PATH = RUNTIME_DIR / "state.json"
-AI_LOG_PATH = RUNTIME_DIR / "ai_calls.jsonl"
 
-OUTPUTS_DIR = REPO_ROOT / "outputs"
-ENV_PATH = OUTPUTS_DIR / ".env"
-JSON_PATH = OUTPUTS_DIR / "keys.json"
-MD_PATH = OUTPUTS_DIR / "keys.md"
-
-DEFAULT_AI_MODEL = "gemini-2.5-flash"
-DEFAULT_AI_BUDGET_PER_RUN = 30
-DEFAULT_AI_BUDGET_PER_STEP = 2
-PLAYWRIGHT_TIMEOUT_MS = 8_000
+def __getattr__(name: str):
+    """Lazy delegation to Settings for old-style config attribute access."""
+    settings = get_settings()
+    # Map old config names to new Settings field names
+    mapping = {
+        "REPO_ROOT": "runtime_dir",  # Closest approximation
+        "PROVIDERS_MD": "providers_md",
+        "RUNTIME_DIR": "runtime_dir",
+        "SCREENSHOTS_DIR": "screenshots_dir",
+        "HTML_DIR": "html_dir",
+        "STATE_PATH": "state_path",
+        "AI_LOG_PATH": "ai_log_path",
+        "OUTPUTS_DIR": "outputs_dir",
+        "ENV_PATH": "env_path",
+        "JSON_PATH": "json_path",
+        "MD_PATH": "md_path",
+        "DEFAULT_AI_MODEL": "ai_model",
+        "DEFAULT_AI_BUDGET_PER_RUN": "ai_budget_per_run",
+        "DEFAULT_AI_BUDGET_PER_STEP": "ai_budget_per_step",
+        "PLAYWRIGHT_TIMEOUT_MS": "playwright_timeout_ms",
+    }
+    if name in mapping:
+        return getattr(settings, mapping[name])
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def ensure_dirs() -> None:
-    for d in (RUNTIME_DIR, SCREENSHOTS_DIR, HTML_DIR, OUTPUTS_DIR):
+    """Create necessary directories. Legacy function for backward compatibility."""
+    settings = get_settings()
+    for d in (
+        settings.runtime_dir,
+        settings.screenshots_dir,
+        settings.html_dir,
+        settings.outputs_dir,
+    ):
         d.mkdir(parents=True, exist_ok=True)

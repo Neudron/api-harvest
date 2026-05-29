@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from harvest.models import HarvestResult, ProviderSpec, RunState
+from harvest.output import secure_chmod
 
 
 class StateStore:
@@ -30,6 +31,7 @@ class StateStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
         tmp.write_text(json.dumps(self.state.to_dict(), indent=2), encoding="utf-8")
+        secure_chmod(tmp)
         os.replace(tmp, self.path)
 
     def mark(self, result: HarvestResult) -> None:
@@ -47,6 +49,38 @@ class StateStore:
             self.save()
             return 1
         return 0
+
+
+def plan_run(
+    specs: list[ProviderSpec],
+    state: RunState,
+    only: set[str] | None = None,
+    skip: set[str] | None = None,
+) -> list[tuple[ProviderSpec, str]]:
+    """Resolve which specs would run, and why each is included or excluded.
+
+    Returns ``[(spec, disposition)]`` in run order, where ``disposition`` is
+    ``"run"`` or a short reason it would be skipped. This is the single source
+    of truth for ``--only``/``--skip``/resume filtering, shared by the
+    ``run --dry-run`` preview and (later) the orchestrator itself.
+    """
+    plan: list[tuple[ProviderSpec, str]] = []
+    for spec in specs:
+        if only and spec.slug not in only:
+            plan.append((spec, "excluded (--only)"))
+            continue
+        if skip and spec.slug in skip:
+            plan.append((spec, "excluded (--skip)"))
+            continue
+        prev = state.results.get(spec.slug)
+        if prev and prev.status == "done":
+            plan.append((spec, "skip (already done)"))
+            continue
+        if prev and prev.user_skipped:
+            plan.append((spec, "skip (user-skipped)"))
+            continue
+        plan.append((spec, "run"))
+    return plan
 
 
 def resume_filter(specs: list[ProviderSpec], state: RunState) -> tuple[list[ProviderSpec], list[ProviderSpec]]:

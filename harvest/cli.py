@@ -14,10 +14,81 @@ from harvest.parser import build_run_order, parse_providers_md
 from harvest.state import StateStore
 
 app = typer.Typer(
-    add_completion=False,
+    add_completion=True,
     help="api-harvest: automate signup at AI providers and harvest API keys.",
 )
 console = Console()
+
+
+def _version_string() -> str:
+    """Resolve the installed version, falling back to the package attribute for
+    editable/unpacked checkouts where distribution metadata may be absent."""
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+
+        try:
+            return version("api-harvest")
+        except PackageNotFoundError:
+            pass
+    except Exception:  # pragma: no cover - importlib always present on 3.11+
+        pass
+    from harvest import __version__
+
+    return __version__
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        console.print(f"api-harvest {_version_string()}")
+        raise typer.Exit()
+
+
+def _complete_slug(incomplete: str) -> list[str]:
+    """Shell-completion for provider slugs (used by --only/--skip and reset)."""
+    try:
+        specs = build_run_order(parse_providers_md(config.PROVIDERS_MD))
+    except Exception:
+        return []
+    return [s.slug for s in specs if s.slug.startswith(incomplete)]
+
+
+@app.callback()
+def _main(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show the api-harvest version and exit.",
+        ),
+    ] = False,
+) -> None:
+    """api-harvest: automate signup at AI providers and harvest API keys."""
+
+
+@app.command()
+def version() -> None:
+    """Print the installed api-harvest version."""
+    console.print(f"api-harvest {_version_string()}")
+
+
+@app.command()
+def doctor() -> None:
+    """Run preflight checks (catalog, outputs, keys, browser deps)."""
+    from harvest.doctor import run_checks
+
+    checks = run_checks()
+    table = Table(title="api-harvest doctor")
+    table.add_column("Check")
+    table.add_column("OK", width=3)
+    table.add_column("Detail")
+    for name, ok, detail in checks:
+        badge = "[green]✓[/green]" if ok else "[red]✗[/red]"
+        table.add_row(name, badge, detail)
+    console.print(table)
+    if not all(ok for _, ok, _ in checks):
+        raise typer.Exit(code=1)
 
 
 @app.command(name="list")
@@ -66,7 +137,11 @@ def status() -> None:
 
 
 @app.command()
-def reset(provider: str | None = typer.Argument(None, help="Slug, or omit to clear all")) -> None:
+def reset(
+    provider: str | None = typer.Argument(
+        None, help="Slug, or omit to clear all", autocompletion=_complete_slug
+    ),
+) -> None:
     config.ensure_dirs()
     store = StateStore(config.STATE_PATH)
     store.load()
@@ -99,14 +174,42 @@ def export(
 def run(
     cdp_port: Annotated[int | None, typer.Option("--cdp-port", help="Attach to running Chrome via CDP")] = None,
     profile_dir: Annotated[Path | None, typer.Option("--profile-dir", help="Use a dedicated Chromium profile dir")] = None,
-    only: Annotated[str | None, typer.Option("--only", help="Comma-separated slugs to include")] = None,
-    skip: Annotated[str | None, typer.Option("--skip", help="Comma-separated slugs to skip")] = None,
+    only: Annotated[str | None, typer.Option("--only", help="Comma-separated slugs to include", autocompletion=_complete_slug)] = None,
+    skip: Annotated[str | None, typer.Option("--skip", help="Comma-separated slugs to skip", autocompletion=_complete_slug)] = None,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Show the resolved run plan and exit without launching a browser")] = False,
     no_dashboard: Annotated[bool, typer.Option("--no-dashboard", help="Disable Rich Live dashboard")] = False,
     ai_model: Annotated[str, typer.Option("--ai-model")] = config.DEFAULT_AI_MODEL,
     ai_budget: Annotated[int, typer.Option("--ai-budget")] = config.DEFAULT_AI_BUDGET_PER_RUN,
     gemini_key: Annotated[str | None, typer.Option("--gemini-key", help="Bootstrap Gemini key (skips AI Studio rescue)")] = None,
 ) -> None:
     """Run the harvest pipeline."""
+    only_set = {s.strip() for s in only.split(",")} if only else None
+    skip_set = {s.strip() for s in skip.split(",")} if skip else None
+
+    if dry_run:
+        from harvest.state import plan_run
+
+        config.ensure_dirs()
+        specs = build_run_order(parse_providers_md(config.PROVIDERS_MD))
+        store = StateStore(config.STATE_PATH)
+        store.load()
+        plan = plan_run(specs, store.state, only_set, skip_set)
+        table = Table(title="Run plan (dry run — no browser launched)")
+        table.add_column("#", width=3)
+        table.add_column("Slug")
+        table.add_column("Disposition")
+        will_run = 0
+        for i, (spec, disp) in enumerate(plan, 1):
+            if disp == "run":
+                will_run += 1
+                style = "[green]run[/green]"
+            else:
+                style = f"[dim]{disp}[/dim]"
+            table.add_row(str(i), spec.slug, style)
+        console.print(table)
+        console.print(f"[bold]{will_run}[/bold] of {len(plan)} providers would run.")
+        return
+
     if cdp_port is not None and profile_dir is not None:
         console.print(
             "[red]--cdp-port and --profile-dir are mutually exclusive. Pick one.[/red]"
@@ -121,8 +224,6 @@ def run(
         raise typer.Exit(code=2)
 
     config.ensure_dirs()
-    only_set = {s.strip() for s in only.split(",")} if only else None
-    skip_set = {s.strip() for s in skip.split(",")} if skip else None
 
     gemini = gemini_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")
 
