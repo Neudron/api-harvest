@@ -13,6 +13,7 @@ from harvest.handlers import HANDLER_REGISTRY
 from harvest.handlers.recipes import GoogleSsoCreateKeyRecipe
 from harvest.models import EventKind, HarvestResult, ProviderSpec, StepEvent
 from harvest.output import append_result
+from harvest.retry import run_with_attempts, run_with_timeout
 from harvest.state import StateStore
 
 if TYPE_CHECKING:
@@ -28,6 +29,10 @@ class RunOptions:
     ai_budget: int = config.DEFAULT_AI_BUDGET_PER_RUN
     gemini_api_key: str | None = None
     hotkeys: object | None = None  # HotkeyState or None
+    # Resilience knobs. Defaults preserve the previous behavior exactly:
+    # max_attempts=1 means no retries; provider_timeout_s=0 disables the watchdog.
+    max_attempts: int = 1
+    provider_timeout_s: float = 0.0
 
 
 def _build_handler(spec: ProviderSpec, ai: AIAssistant | None, interactive: InteractiveManager, bus: EventBus):
@@ -124,65 +129,92 @@ async def run_pipeline(
                 await bus.emit(StepEvent(provider_slug=spec.slug, kind=EventKind.SKIP, message="CC declined"))
                 continue
 
-        page = await new_page(handle)
-        try:
-            handler = _build_handler(spec, ai, interactive, bus)
+        # Never auto-retry providers whose signup creates a real account behind
+        # a CC/phone gate — a retry there risks duplicate accounts / rate limits.
+        attempts = 1 if (spec.requires_cc or spec.requires_phone) else max(1, options.max_attempts)
+
+        async def _attempt(spec=spec, ai=ai) -> HarvestResult:
+            """One provider attempt: fresh page, optional timeout watchdog, always closed."""
+            page = await new_page(handle)
             try:
-                result = await handler.run(page)
-            except (asyncio.CancelledError, KeyboardInterrupt):
-                # Mark the in-flight provider as user_skipped so it isn't retried
-                # on the next run, then re-raise so the caller can clean up.
-                result = HarvestResult(
-                    provider_slug=spec.slug,
-                    provider_name=spec.name,
-                    tier=spec.tier,
-                    status="skipped",
-                    env_var=spec.env_var,
-                    dashboard_url=spec.api_key_url,
-                    rate_limits=spec.rate_limits,
-                    user_skipped=True,
-                    notes="interrupted (Ctrl+C)",
-                )
-                state_store.mark(result)
-                append_result(
-                    result,
-                    env_path=config.ENV_PATH,
-                    json_path=config.JSON_PATH,
-                    md_path=config.MD_PATH,
-                )
-                raise
-            except Exception as e:
-                # Write the full traceback to disk so debugging doesn't depend
-                # on whatever truncated string we put in result.error.
-                err_dir = config.RUNTIME_DIR / "errors"
-                err_dir.mkdir(parents=True, exist_ok=True)
-                ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-                err_path = err_dir / f"{spec.slug}-{ts}.log"
-                try:
-                    err_path.write_text(
-                        f"Provider: {spec.slug}\nException: {type(e).__name__}: {e}\n\n"
-                        + traceback.format_exc(),
-                        encoding="utf-8",
+                handler = _build_handler(spec, ai, interactive, bus)
+                if options.provider_timeout_s and options.provider_timeout_s > 0:
+                    return await run_with_timeout(
+                        lambda: handler.run(page),
+                        timeout_s=options.provider_timeout_s,
+                        is_paused=lambda: interactive.is_blocking_user,
                     )
+                return await handler.run(page)
+            finally:
+                try:
+                    if handle.is_cdp and page in handle.owned_pages:
+                        handle.owned_pages.remove(page)
+                    await page.close()
                 except Exception:
                     pass
-                result = HarvestResult(
+
+        async def _on_retry(attempt: int, exc: BaseException, spec=spec) -> None:
+            await bus.emit(
+                StepEvent(
                     provider_slug=spec.slug,
-                    provider_name=spec.name,
-                    tier=spec.tier,
-                    status="failed",
-                    env_var=spec.env_var,
-                    dashboard_url=spec.api_key_url,
-                    rate_limits=spec.rate_limits,
-                    error=f"{type(e).__name__}: {e} (traceback: {err_path})",
+                    kind=EventKind.RETRY,
+                    message=f"attempt {attempt} failed ({type(exc).__name__}); retrying",
                 )
-        finally:
+            )
+
+        try:
+            result = await run_with_attempts(
+                _attempt,
+                max_attempts=attempts,
+                on_retry=_on_retry,
+            )
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            # Mark the in-flight provider as user_skipped so it isn't retried
+            # on the next run, then re-raise so the caller can clean up.
+            result = HarvestResult(
+                provider_slug=spec.slug,
+                provider_name=spec.name,
+                tier=spec.tier,
+                status="skipped",
+                env_var=spec.env_var,
+                dashboard_url=spec.api_key_url,
+                rate_limits=spec.rate_limits,
+                user_skipped=True,
+                notes="interrupted (Ctrl+C)",
+            )
+            state_store.mark(result)
+            append_result(
+                result,
+                env_path=config.ENV_PATH,
+                json_path=config.JSON_PATH,
+                md_path=config.MD_PATH,
+            )
+            raise
+        except Exception as e:
+            # Write the full traceback to disk so debugging doesn't depend
+            # on whatever truncated string we put in result.error.
+            err_dir = config.RUNTIME_DIR / "errors"
+            err_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+            err_path = err_dir / f"{spec.slug}-{ts}.log"
             try:
-                if handle.is_cdp and page in handle.owned_pages:
-                    handle.owned_pages.remove(page)
-                await page.close()
+                err_path.write_text(
+                    f"Provider: {spec.slug}\nException: {type(e).__name__}: {e}\n\n"
+                    + traceback.format_exc(),
+                    encoding="utf-8",
+                )
             except Exception:
                 pass
+            result = HarvestResult(
+                provider_slug=spec.slug,
+                provider_name=spec.name,
+                tier=spec.tier,
+                status="failed",
+                env_var=spec.env_var,
+                dashboard_url=spec.api_key_url,
+                rate_limits=spec.rate_limits,
+                error=f"{type(e).__name__}: {e} (traceback: {err_path})",
+            )
 
         state_store.mark(result)
         if ai is not None:

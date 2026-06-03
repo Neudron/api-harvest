@@ -120,6 +120,7 @@ class EventKind(StrEnum):
     SUCCESS = "success"
     SKIP = "skip"
     FAIL = "fail"
+    RETRY = "retry"
     AI_CALL = "ai_call"
     PROMPT = "prompt"
     DASHBOARD_PAUSE = "dashboard_pause"

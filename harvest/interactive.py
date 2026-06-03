@@ -33,12 +33,24 @@ class InteractiveManager:
     def __init__(self, dashboard: Dashboard | None, console: Console):
         self.dashboard = dashboard
         self.console = console
+        # Number of interactive prompts currently open. The per-provider timeout
+        # watchdog reads this to pause its clock while the user is blocking (so
+        # manual CC/SMS/CAPTCHA entry is never cut off by the wall-clock limit).
+        self._blocking_depth = 0
+
+    @property
+    def is_blocking_user(self) -> bool:
+        """True while at least one interactive prompt is awaiting user input."""
+        return self._blocking_depth > 0
 
     async def _pause(self) -> None:
+        self._blocking_depth += 1
         if self.dashboard is not None:
             await self.dashboard.pause()
 
     async def _resume(self) -> None:
+        if self._blocking_depth > 0:
+            self._blocking_depth -= 1
         if self.dashboard is not None:
             await self.dashboard.resume()
 
