@@ -56,6 +56,31 @@ def test_complete_slug_matches_prefix() -> None:
     assert _complete_slug("zzz-no-such") == []
 
 
+def test_report_command(tmp_path: Path, monkeypatch) -> None:
+    from harvest import config
+
+    outputs = tmp_path / "outputs"
+    outputs.mkdir()
+    (outputs / "keys.json").write_text(
+        json.dumps(
+            [
+                {"provider_slug": "groq", "provider_name": "Groq", "tier": 1, "status": "done"},
+                {"provider_slug": "x", "provider_name": "X", "tier": 1, "status": "failed",
+                 "error": "boom"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(config, "OUTPUTS_DIR", outputs)
+    monkeypatch.setattr(config, "JSON_PATH", outputs / "keys.json")
+    monkeypatch.setattr(config, "RUNTIME_DIR", tmp_path / ".harvest")
+    result = runner.invoke(app, ["report"])
+    assert result.exit_code == 0, result.stdout
+    assert "2 providers" in result.stdout
+    assert (outputs / "report.md").exists()
+    assert "Success rate: **50%**" in (outputs / "report.md").read_text()
+
+
 def test_ai_log_empty(tmp_path: Path, monkeypatch) -> None:
     from harvest import config
 
