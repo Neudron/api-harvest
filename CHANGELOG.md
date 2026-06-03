@@ -30,7 +30,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`harvest/ai/audit.py`): calls per provider, error rate, rescue confidence.
 - `report` command writing `outputs/report.md` (`harvest/report.py`): overall
   success rate, per-tier breakdown, and failure reasons.
+- **Handler plugin system**: third-party handlers can register via the
+  `harvest.handlers` entry-point group. Core handlers win slug collisions;
+  broken plugins are skipped. (Trust boundary: plugins run arbitrary automation.)
 - CI now runs a Python 3.11 / 3.12 / 3.13 matrix.
+
+### Tested
+- Handler recipes (`GoogleSsoCreateKeyRecipe`) now have offline smoke tests via
+  a `FakePage`/`FakeLocator` harness, covering captured-key/done, missing-key and
+  unclickable-button failures, and CAPTCHA / Google sign-in takeover routing.
 
 ### Changed
 - Secret files (`.env`, `keys.json`, `state.json`, `ai_calls.jsonl`) are written
