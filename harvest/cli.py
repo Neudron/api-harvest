@@ -136,6 +136,32 @@ def status() -> None:
     console.print(f"AI rescue calls used so far: [bold]{state.ai_budget_used}[/bold]")
 
 
+@app.command(name="ai-log")
+def ai_log() -> None:
+    """Summarize the AI selector-rescue audit log (ai_calls.jsonl)."""
+    from harvest.ai.audit import load_records, summarize
+
+    records = load_records(config.AI_LOG_PATH)
+    summary = summarize(records)
+    if summary.total_calls == 0:
+        console.print("No AI rescue calls recorded yet.")
+        return
+
+    console.print(
+        f"AI rescue calls: [bold]{summary.total_calls}[/bold] "
+        f"({summary.successes} ok, {summary.errors} errors, "
+        f"{summary.error_rate:.0%} error rate)"
+    )
+    table = Table(title="AI rescue calls per provider")
+    table.add_column("Provider")
+    table.add_column("Calls", justify="right")
+    table.add_column("Confident suggestion")
+    for provider, count in sorted(summary.per_provider.items(), key=lambda kv: (-kv[1], kv[0])):
+        confident = "yes" if provider in summary.confident_providers else "—"
+        table.add_row(provider, str(count), confident)
+    console.print(table)
+
+
 @app.command()
 def reset(
     provider: str | None = typer.Argument(
