@@ -258,7 +258,7 @@ async def _run_async(
 ) -> None:
     from harvest.browser import close_browser, open_browser
     from harvest.dashboard import Dashboard
-    from harvest.events import EventBus
+    from harvest.events import EventBus, JsonlEventSink
     from harvest.hotkeys import HotkeyState, run_hotkey_listener
     from harvest.interactive import InteractiveManager
     from harvest.orchestrator import RunOptions, run_pipeline
@@ -274,9 +274,18 @@ async def _run_async(
 
     handle = await open_browser(cdp_port=cdp_port, profile_dir=profile_dir)
 
+    # Register subscriptions synchronously *before* scheduling tasks so no early
+    # events are missed (fan-out only delivers to subscribers present at emit time).
     dashboard_task = None
     if dashboard is not None:
-        dashboard_task = asyncio.create_task(dashboard.run(bus))
+        dash_stream = bus.subscribe()
+        dashboard_task = asyncio.create_task(dashboard.run(bus, events=dash_stream))
+
+    # JSONL audit sink: every event recorded to .harvest/events.jsonl for reporting.
+    sink = JsonlEventSink(config.RUNTIME_DIR / "events.jsonl")
+    sink_stream = bus.subscribe()
+    sink_task = asyncio.create_task(sink.run(bus, events=sink_stream))
+
     hotkey_task = asyncio.create_task(run_hotkey_listener(hotkeys, bus))
 
     options = RunOptions(
@@ -307,6 +316,10 @@ async def _run_async(
                 await asyncio.wait_for(dashboard_task, timeout=2.0)
             except TimeoutError:
                 dashboard_task.cancel()
+        try:
+            await asyncio.wait_for(sink_task, timeout=2.0)
+        except TimeoutError:
+            sink_task.cancel()
         hotkey_task.cancel()
         try:
             await asyncio.wait_for(hotkey_task, timeout=1.0)
