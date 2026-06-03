@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
+from collections.abc import AsyncIterator
 
 from rich.console import Console
 from rich.layout import Layout
@@ -127,12 +128,17 @@ class Dashboard:
         self._layout["recent"].update(self._render_recent())
         self._layout["footer"].update(self._render_footer())
 
-    async def run(self, bus: EventBus) -> None:
+    async def run(self, bus: EventBus, events: AsyncIterator[StepEvent] | None = None) -> None:
+        # Subscribe synchronously at call time if a stream wasn't pre-supplied.
+        # The caller can pass ``bus.subscribe()`` created *before* scheduling
+        # this task to guarantee no early events are missed (fan-out drops
+        # events emitted before a subscriber registers).
+        stream = events if events is not None else bus.subscribe()
         self._refresh()
         self._live = Live(self._layout, console=self.console, refresh_per_second=8, screen=False)
         self._live.start()
         try:
-            async for event in bus.stream():
+            async for event in stream:
                 self._apply(event)
                 if self.paused.is_set() and self._live is not None and self._live.is_started:
                     self._refresh()
