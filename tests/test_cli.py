@@ -56,6 +56,33 @@ def test_complete_slug_matches_prefix() -> None:
     assert _complete_slug("zzz-no-such") == []
 
 
+def test_ai_log_empty(tmp_path: Path, monkeypatch) -> None:
+    from harvest import config
+
+    monkeypatch.setattr(config, "AI_LOG_PATH", tmp_path / "ai_calls.jsonl")
+    result = runner.invoke(app, ["ai-log"])
+    assert result.exit_code == 0, result.stdout
+    assert "No AI rescue calls" in result.stdout
+
+
+def test_ai_log_summary(tmp_path: Path, monkeypatch) -> None:
+    from harvest import config
+
+    log = tmp_path / "ai_calls.jsonl"
+    log.write_text(
+        json.dumps({"provider": "groq", "suggestion": {"confidence": 0.9}}) + "\n"
+        + json.dumps({"provider": "groq", "error": "boom"}) + "\n"
+        + json.dumps({"provider": "cohere", "suggestion": {"confidence": 0.6}}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(config, "AI_LOG_PATH", log)
+    result = runner.invoke(app, ["ai-log"])
+    assert result.exit_code == 0, result.stdout
+    assert "3" in result.stdout  # total calls
+    assert "groq" in result.stdout
+    assert "cohere" in result.stdout
+
+
 def test_run_dry_run_lists_plan(tmp_path: Path, monkeypatch) -> None:
     from harvest import config
 
