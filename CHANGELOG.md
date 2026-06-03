@@ -28,6 +28,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   completion for provider slugs; `run --dry-run` to preview the run plan.
 - `ai-log` command summarizing the AI selector-rescue audit log
   (`harvest/ai/audit.py`): calls per provider, error rate, rescue confidence.
+- `report` command writing `outputs/report.md` (`harvest/report.py`): overall
+  success rate, per-tier breakdown, and failure reasons.
 - CI now runs a Python 3.11 / 3.12 / 3.13 matrix.
 
 ### Changed
