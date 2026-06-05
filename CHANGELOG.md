@@ -41,6 +41,50 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   unclickable-button failures, and CAPTCHA / Google sign-in takeover routing.
 
 ### Changed
+- **Rich dashboard redesign** (`harvest/dashboard.py`). A cohesive design system
+  (semantic success/danger/warning/info palette, cyan brand accent), status
+  badges with icons (`✓ DONE`, `◐ RUN`, `✗ FAIL`, `↷ SKIP`, `· WAIT`), a
+  tier-grouped provider table with an active-row marker and per-provider CC/SMS
+  flags, and a colour-coded activity log. The header now shows live status pills
+  plus elapsed time, AI-rescue count, and retry count. The dashboard is now the
+  Live renderable itself (`__rich__`), repainted by a single-threaded asyncio
+  ticker (Rich's background refresh thread is disabled), so the clock, spinner,
+  and progress bar animate continuously between events without the render ever
+  racing the event loop's state updates.
+  - **`[p]` pause hotkey is now actually wired**: it previously emitted
+    `DASHBOARD_PAUSE`/`RESUME` events that `_apply` dropped, so the view never
+    froze. `_apply` now soft-freezes/unfreezes the view (without tearing down
+    Live), and the footer shows a `PAUSED` indicator.
+  - **`RETRY` events are now handled** (were silently ignored): they increment a
+    retry counter shown in the header and update the current step.
+  - The footer lists every key: `[p]` pause/resume, `[s]` skip, `[q]` quit,
+    `^C` abort.
+- **Provider API-key URLs refreshed to canonical paths** (`providers.md`). Entries
+  that previously stored a bare domain plus a parenthetical note (e.g.
+  `https://console.mistral.ai (API Keys section after login)`) now hold a single
+  clean, navigable URL — the parser uses the whole field value as the navigation
+  target, so the parenthetical text was being passed to `page.goto()`. Deep
+  "create key" paths were verified and adopted where stable/account-agnostic:
+  Mistral (`/api-keys`), Cohere (`/api-keys`), NVIDIA NIM (`/settings/api-keys`),
+  Cloudflare (`/profile/api-tokens`), Anthropic (`/settings/keys`), Baseten
+  (`/settings/api_keys`), Nebius (`/project/api-keys`), Upstage (`/api-keys`),
+  Modal (`/settings/tokens`), Hyperbolic (`/settings/api-keys`), Scaleway
+  (`/iam/api-keys`), Novita (`/settings/key-management`), OpenCode Zen (`/zen`).
+  Team/session-scoped consoles (Cerebras, xAI, AI21, Inference.net, NLP Cloud)
+  keep their stable bare domain.
+- **Provider free-tier / trial claims refreshed for accuracy** (`providers.md`),
+  free-text only — no behavioural fields (`requires_cc` / `requires_phone`)
+  changed. Notably: GitHub Models is no longer "via Copilot Free plan" (Copilot
+  moved to usage-based AI Credits on 2026-06-01; the Models API has separate
+  per-account quotas); Modal's Starter plan now grants $30/month to all accounts;
+  xAI's $25 is a one-time signup credit, not recurring; Azure OpenAI no longer
+  requires the manual Limited Access approval; Venice AI restructured into four
+  tiers (Pro $18/mo includes API access); plus Gemini (free = Flash-class),
+  Codestral (free beta ended), Vercel (card verification), and Perplexity
+  (Pro API credit withdrawn) clarifications.
+- GitHub Models handler now opens the current fine-grained PAT page
+  (`/settings/personal-access-tokens/new`) instead of the legacy
+  `/settings/tokens?type=beta` URL.
 - Secret files (`.env`, `keys.json`, `state.json`, `ai_calls.jsonl`) are written
   with owner-only `0o600` permissions via a shared `output.secure_chmod()` helper.
 
