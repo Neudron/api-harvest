@@ -72,6 +72,10 @@ class Settings(BaseModel):
         ge=1,
         description="Wall-clock timeout per provider in seconds",
     )
+    validate_keys: bool = Field(
+        default=False,
+        description="Probe each captured key against its provider API (run --validate)",
+    )
 
     # Parallelism (architectural, default OFF)
     concurrency: int = Field(
@@ -219,6 +223,7 @@ def load_settings(
         playwright_timeout_ms=settings.playwright_timeout_ms,
         max_attempts=settings.max_attempts,
         provider_timeout_s=settings.provider_timeout_s,
+        validate_keys=settings.validate_keys,
         concurrency=settings.concurrency,
         encrypt_at_rest=settings.encrypt_at_rest,
         log_level=settings.log_level,

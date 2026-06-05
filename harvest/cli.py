@@ -196,6 +196,73 @@ def export(
     console.print(f"Re-rendered {sorted(formats)} from {n} stored results.")
 
 
+@app.command(name="validate")
+def validate_keys(
+    only: Annotated[str | None, typer.Option("--only", help="Comma-separated slugs to include", autocompletion=_complete_slug)] = None,
+    skip: Annotated[str | None, typer.Option("--skip", help="Comma-separated slugs to skip", autocompletion=_complete_slug)] = None,
+) -> None:
+    """Probe harvested keys (from keys.json) against each provider's API.
+
+    Records the outcome back into keys.json / keys.md and exits non-zero if any
+    captured key fails to authenticate.
+    """
+    config.ensure_dirs()
+    from harvest.output import load_results, update_validation
+    from harvest.validate import iso_now, validate_key
+
+    only_set = {s.strip() for s in only.split(",")} if only else None
+    skip_set = {s.strip() for s in skip.split(",")} if skip else None
+
+    rows = load_results(config.JSON_PATH)
+    rows = [r for r in rows if r.get("api_key")]
+    if only_set:
+        rows = [r for r in rows if r.get("provider_slug") in only_set]
+    if skip_set:
+        rows = [r for r in rows if r.get("provider_slug") not in skip_set]
+
+    if not rows:
+        console.print("[yellow]No harvested keys to validate (keys.json is empty).[/yellow]")
+        return
+
+    table = Table(title="Key validation")
+    table.add_column("Provider")
+    table.add_column("Result")
+    table.add_column("HTTP")
+    table.add_column("Latency")
+    table.add_column("Detail")
+
+    _styles = {"valid": "green", "invalid": "red", "unsupported": "dim", "error": "yellow"}
+    invalid = 0
+    for r in rows:
+        slug = r.get("provider_slug", "")
+        outcome = validate_key(slug, r.get("api_key"))
+        update_validation(
+            slug,
+            validation_status=outcome.status,
+            validation_detail=outcome.detail,
+            validated_at=iso_now(),
+            json_path=config.JSON_PATH,
+            md_path=config.MD_PATH,
+        )
+        if outcome.status == "invalid":
+            invalid += 1
+        style = _styles.get(outcome.status, "white")
+        latency = f"{outcome.latency_ms}ms" if outcome.latency_ms is not None else "—"
+        http = str(outcome.http_status) if outcome.http_status is not None else "—"
+        table.add_row(
+            r.get("provider_name", slug),
+            f"[{style}]{outcome.status}[/{style}]",
+            http,
+            latency,
+            outcome.detail,
+        )
+
+    console.print(table)
+    if invalid:
+        console.print(f"[red]{invalid} key(s) failed validation.[/red]")
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def report() -> None:
     """Write a run summary (outputs/report.md) from keys.json."""
@@ -215,6 +282,7 @@ def run(
     skip: Annotated[str | None, typer.Option("--skip", help="Comma-separated slugs to skip", autocompletion=_complete_slug)] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show the resolved run plan and exit without launching a browser")] = False,
     no_dashboard: Annotated[bool, typer.Option("--no-dashboard", help="Disable Rich Live dashboard")] = False,
+    validate: Annotated[bool, typer.Option("--validate/--no-validate", help="Probe each captured key against its provider API to confirm it works")] = False,
     ai_model: Annotated[str, typer.Option("--ai-model")] = config.DEFAULT_AI_MODEL,
     ai_budget: Annotated[int, typer.Option("--ai-budget")] = config.DEFAULT_AI_BUDGET_PER_RUN,
     gemini_key: Annotated[str | None, typer.Option("--gemini-key", help="Bootstrap Gemini key (skips AI Studio rescue)")] = None,
@@ -272,6 +340,7 @@ def run(
                 only_set=only_set,
                 skip_set=skip_set,
                 no_dashboard=no_dashboard,
+                validate=validate,
                 ai_model=ai_model,
                 ai_budget=ai_budget,
                 gemini_key=gemini,
@@ -289,6 +358,7 @@ async def _run_async(
     only_set: set[str] | None,
     skip_set: set[str] | None,
     no_dashboard: bool,
+    validate: bool,
     ai_model: str,
     ai_budget: int,
     gemini_key: str | None,
@@ -332,6 +402,7 @@ async def _run_async(
         ai_budget=ai_budget,
         gemini_api_key=gemini_key,
         hotkeys=hotkeys,
+        validate=validate,
     )
 
     interrupted = False

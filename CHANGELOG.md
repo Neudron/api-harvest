@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Live key validation** (`harvest/validate.py`): a new `harvest validate`
+  command and a `harvest run --validate` flag that make one cheap authenticated
+  probe per provider (almost always `GET {base}/v1/models`) to confirm a captured
+  key actually authenticates, instead of only matching its format regex. Outcomes
+  (`valid` / `invalid` / `unsupported` / `error`) are recorded on each
+  `HarvestResult` and surfaced in `keys.json`, a new `Valid` column in `keys.md`,
+  the dashboard (`EventKind.VALIDATE`), and the command's exit code (non-zero on
+  any invalid key). Stdlib-only (`urllib.request`) so it adds no dependency, with
+  an injectable opener that keeps the tests fully offline. Providers without an
+  account-agnostic probe resolve to `unsupported` rather than a false failure.
+
 - **Retries with backoff** (`harvest/retry.py`): opt-in per-provider retries with
   exponential backoff. `is_retryable()` classifies transient failures
   (`HandlerError`, timeouts) vs. terminal ones (CAPTCHA, manual login, user skip,

@@ -67,6 +67,13 @@ def _write_json(path: Path, results: list[dict]) -> None:
     _atomic_write(path, json.dumps(results, indent=2) + "\n")
 
 
+_VALIDATION_GLYPHS = {"valid": "✓", "invalid": "✗", "unsupported": "–", "error": "!"}
+
+
+def _validation_glyph(status: str | None) -> str:
+    return _VALIDATION_GLYPHS.get(status or "", "")
+
+
 def _render_md(results: list[dict]) -> str:
     by_tier: dict[int, list[dict]] = {}
     for r in results:
@@ -76,8 +83,10 @@ def _render_md(results: list[dict]) -> str:
     for tier in sorted(by_tier.keys()):
         out.append(f"## Tier {tier}")
         out.append("")
-        out.append("| Provider | Status | Env Var | Key (last 4) | Rate Limits | Dashboard | Created |")
-        out.append("|---|---|---|---|---|---|---|")
+        out.append(
+            "| Provider | Status | Valid | Env Var | Key (last 4) | Rate Limits | Dashboard | Created |"
+        )
+        out.append("|---|---|---|---|---|---|---|---|")
         for r in sorted(by_tier[tier], key=lambda x: x.get("provider_slug", "")):
             key = r.get("api_key") or ""
             tail = f"…{key[-4:]}" if key else "—"
@@ -86,8 +95,9 @@ def _render_md(results: list[dict]) -> str:
             dash = r.get("dashboard_url") or ""
             dash_link = f"[link]({dash})" if dash else "—"
             created = (r.get("created_at") or "—")[:19]
+            valid = _validation_glyph(r.get("validation_status"))
             out.append(
-                f"| {r['provider_name']} | {r['status']} | `{env}` | `{tail}` | {rate} | {dash_link} | {created} |"
+                f"| {r['provider_name']} | {r['status']} | {valid} | `{env}` | `{tail}` | {rate} | {dash_link} | {created} |"
             )
         out.append("")
     return "\n".join(out)
@@ -108,6 +118,40 @@ def append_result(result: HarvestResult, *, env_path: Path, json_path: Path, md_
 
     # keys.md: re-render from json
     _atomic_write(md_path, _render_md(results))
+
+
+def load_results(json_path: Path) -> list[dict]:
+    """Public reader for the stored keys.json rows (list of result dicts)."""
+    return _read_json(json_path)
+
+
+def update_validation(
+    slug: str,
+    *,
+    validation_status: str,
+    validation_detail: str,
+    validated_at: str,
+    json_path: Path,
+    md_path: Path,
+) -> bool:
+    """Upsert the validation fields onto an existing keys.json row, re-render md.
+
+    Returns True if a matching row was found and updated. The .env file is left
+    untouched: validation never changes the key value.
+    """
+    results = _read_json(json_path)
+    found = False
+    for r in results:
+        if r.get("provider_slug") == slug:
+            r["validation_status"] = validation_status
+            r["validation_detail"] = validation_detail
+            r["validated_at"] = validated_at
+            found = True
+            break
+    if found:
+        _write_json(json_path, results)
+        _atomic_write(md_path, _render_md(results))
+    return found
 
 
 def rerender(

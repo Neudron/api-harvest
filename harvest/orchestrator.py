@@ -33,6 +33,41 @@ class RunOptions:
     # max_attempts=1 means no retries; provider_timeout_s=0 disables the watchdog.
     max_attempts: int = 1
     provider_timeout_s: float = 0.0
+    # Probe each captured key against the provider's API to confirm it works.
+    validate: bool = False
+
+
+async def _validate_result(
+    spec: ProviderSpec,
+    result: HarvestResult,
+    state_store: StateStore,
+    bus: EventBus,
+) -> None:
+    """Probe the captured key, record the outcome on disk, and surface an event."""
+    from harvest.output import update_validation
+    from harvest.validate import iso_now, validate_key_async
+
+    outcome = await validate_key_async(spec.slug, result.api_key)
+    result.validation_status = outcome.status
+    result.validation_detail = outcome.detail
+    result.validated_at = iso_now()
+    state_store.mark(result)
+    update_validation(
+        spec.slug,
+        validation_status=outcome.status,
+        validation_detail=outcome.detail,
+        validated_at=result.validated_at,
+        json_path=config.JSON_PATH,
+        md_path=config.MD_PATH,
+    )
+    await bus.emit(
+        StepEvent(
+            provider_slug=spec.slug,
+            kind=EventKind.VALIDATE,
+            message=f"key {outcome.status}: {outcome.detail}",
+            payload={"validation_status": outcome.status},
+        )
+    )
 
 
 def _build_handler(spec: ProviderSpec, ai: AIAssistant | None, interactive: InteractiveManager, bus: EventBus):
@@ -236,6 +271,8 @@ async def run_pipeline(
                     payload={"api_key": result.api_key or ""},
                 )
             )
+            if options.validate and result.api_key:
+                await _validate_result(spec, result, state_store, bus)
             # Bootstrap AI assistant after Google AI Studio succeeds
             if spec.slug == "google-gemini-ai-studio" and ai is None and result.api_key:
                 from harvest.ai import GeminiBackend
