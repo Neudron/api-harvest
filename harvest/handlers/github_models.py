@@ -18,7 +18,7 @@ class GithubModelsHandler(Handler):
         try:
             await self.step("opening github PAT page")
             await page.goto(
-                "https://github.com/settings/tokens?type=beta",
+                "https://github.com/settings/personal-access-tokens/new",
                 wait_until="domcontentloaded",
             )
 
@@ -30,7 +30,7 @@ class GithubModelsHandler(Handler):
                 if choice != "resume":
                     return self._skipped("user did not sign in")
                 await page.goto(
-                    "https://github.com/settings/tokens?type=beta",
+                    "https://github.com/settings/personal-access-tokens/new",
                     wait_until="domcontentloaded",
                 )
 

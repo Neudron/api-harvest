@@ -43,7 +43,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://cloud.cerebras.ai
-- **API Key URL:** https://cloud.cerebras.ai (Dashboard > API Keys after login)
+- **API Key URL:** https://cloud.cerebras.ai
 - **Gotchas:** Context length capped at 8,192 tokens on free tier (128K+ on paid). Ultra-fast inference — 20x faster than OpenAI/Anthropic. Some models being deprecated (Llama 3.1 8B, Qwen 3 235B — May 27, 2026). Developer tier ($10 min deposit) gives 10x limits + priority.
 
 ### 4. Mistral (La Plateforme)
@@ -55,7 +55,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Requires phone verification:** Yes
 - **Data used for training:** Yes (required to opt-in for Experiment plan)
 - **Signup URL:** https://console.mistral.ai
-- **API Key URL:** https://console.mistral.ai (API Keys section after login)
+- **API Key URL:** https://console.mistral.ai/api-keys
 - **Gotchas:** 1 RPS is very restrictive — fine for testing only, not for production. Must opt-in to data training. Phone verification required. Experiment plan may change.
 
 ### 5. Mistral Codestral (Separate Endpoint)
@@ -67,7 +67,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Requires phone verification:** Yes
 - **Data used for training:** No
 - **Signup URL:** https://codestral.mistral.ai
-- **API Key URL:** https://codestral.mistral.ai (API Key in dashboard)
+- **API Key URL:** https://codestral.mistral.ai
 - **Gotchas:** Code-focused model only. Currently free. Monthly subscription model may change. Separate from main Mistral platform.
 
 ### 6. OpenRouter
@@ -91,7 +91,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://dashboard.cohere.com/welcome/register
-- **API Key URL:** https://dashboard.cohere.com (API Keys section after login)
+- **API Key URL:** https://dashboard.cohere.com/api-keys
 - **Gotchas:** Only 1,000 API calls/month TOTAL across all models — very limited. Trial keys cannot be used for production or commercial purposes. Some users report responses getting cut off mid-sentence on trial keys.
 
 ### 8. Vercel AI Gateway
@@ -115,7 +115,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Requires phone verification:** Yes
 - **Data used for training:** No
 - **Signup URL:** https://build.nvidia.com/explore/discover
-- **API Key URL:** https://build.nvidia.com (API Key in dashboard after login)
+- **API Key URL:** https://build.nvidia.com/settings/api-keys
 - **Gotchas:** Models tend to have limited context windows. Phone verification required. Good for quick prototyping.
 
 ### 10. GitHub Models
@@ -127,7 +127,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://github.com/marketplace/models
-- **API Key URL:** https://github.com/settings/tokens (Personal Access Token with `models` scope)
+- **API Key URL:** https://github.com/settings/personal-access-tokens
 - **Gotchas:** Extremely restrictive input/output token limits. Uses GitHub PAT, not traditional API key. Good for prototyping only. Access depends on Copilot subscription tier.
 
 ### 11. Cloudflare Workers AI
@@ -139,7 +139,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://dash.cloudflare.com/sign-up
-- **API Key URL:** https://dash.cloudflare.com (Workers AI section)
+- **API Key URL:** https://dash.cloudflare.com/profile/api-tokens
 - **Gotchas:** Neuron-based pricing is unusual — different models consume different neuron amounts. 10,000 neurons/day may not go far with larger models. Good for lightweight inference tasks.
 
 ### 12. HuggingFace Inference Providers
@@ -163,7 +163,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Requires phone verification:** No
 - **Data used for training:** Yes (free models may use data for improvement)
 - **Signup URL:** https://opencode.ai/docs/zen/
-- **API Key URL:** https://opencode.ai (Dashboard)
+- **API Key URL:** https://opencode.ai/zen
 - **Gotchas:** AI gateway with curated free models. Very limited model selection. Data may be used for model improvement. Part of the OpenCode project.
 
 ---
@@ -181,7 +181,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://console.x.ai/
-- **API Key URL:** https://console.x.ai/ (API Keys section after login)
+- **API Key URL:** https://console.x.ai/
 - **Gotchas:** The $150/month data-sharing program was discontinued May 2025, but the base $25/month credits remain. This is the BEST recurring credit deal available. No credit card needed — just email signup.
 
 ### 2. Alibaba/Qwen (DashScope)
@@ -205,7 +205,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://console.anthropic.com/
-- **API Key URL:** https://console.anthropic.com/ (API Keys section after login)
+- **API Key URL:** https://console.anthropic.com/settings/keys
 - **Gotchas:** Some users don't receive the credits automatically — may need to contact support. $5 is modest but enough for light testing. No credit card needed. Best way to try Claude models for free.
 
 ### 4. SambaNova Cloud
@@ -289,7 +289,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://app.baseten.co/
-- **API Key URL:** https://app.baseten.co/ (Settings > API Keys)
+- **API Key URL:** https://app.baseten.co/settings/api_keys
 - **Gotchas:** $30 is generous. Pay by compute time, not tokens. Good for custom model deployments. Model library at https://www.baseten.co/library/
 
 ### 11. Nebius
@@ -301,7 +301,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://tokenfactory.nebius.com/
-- **API Key URL:** https://tokenfactory.nebius.com/ (API Keys section)
+- **API Key URL:** https://tokenfactory.nebius.com/project/api-keys
 - **Gotchas:** Only $1. Competitive inference pricing. Good for EU-based users.
 
 ### 12. NLP Cloud
@@ -313,7 +313,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires credit card:** No
 - **Data used for training:** No
 - **Signup URL:** https://nlpcloud.com/home
-- **API Key URL:** https://nlpcloud.com/ (Dashboard)
+- **API Key URL:** https://nlpcloud.com/home
 - **Gotchas:** Phone verification required. $15 is decent for testing. Good selection of open-source models.
 
 ### 13. AI21
@@ -325,7 +325,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://studio.ai21.com/
-- **API Key URL:** https://studio.ai21.com/ (API Keys section)
+- **API Key URL:** https://studio.ai21.com/
 - **Gotchas:** Only Jamba family models. $10 over 3 months is limited. Niche provider.
 
 ### 14. Upstage
@@ -337,7 +337,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://console.upstage.ai/
-- **API Key URL:** https://console.upstage.ai/ (API Keys section)
+- **API Key URL:** https://console.upstage.ai/api-keys
 - **Gotchas:** Only Solar models. Korean-focused provider. $10 over 3 months.
 
 ### 15. Modal
@@ -349,7 +349,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://modal.com/
-- **API Key URL:** https://modal.com/ (Settings > API Keys)
+- **API Key URL:** https://modal.com/settings/tokens
 - **Gotchas:** $5/month recurring without CC, $30/month with CC. Serverless compute platform — you deploy and run models, pay by compute time. Good for custom inference.
 
 ### 16. Hyperbolic
@@ -361,7 +361,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://app.hyperbolic.ai/
-- **API Key URL:** https://app.hyperbolic.ai/ (API Keys section)
+- **API Key URL:** https://app.hyperbolic.ai/settings/api-keys
 - **Gotchas:** Only $1. Claims to be the cheapest GPU marketplace. Very limited trial.
 
 ### 17. Inference.net
@@ -373,7 +373,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://inference.net
-- **API Key URL:** https://inference.net (Dashboard)
+- **API Key URL:** https://inference.net
 - **Gotchas:** The email survey bonus ($25) makes this worthwhile. Without survey, only $1.
 
 ### 18. Scaleway Generative APIs
@@ -385,7 +385,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://console.scaleway.com/generative-api/models
-- **API Key URL:** https://console.scaleway.com/ (API Keys section)
+- **API Key URL:** https://console.scaleway.com/iam/api-keys
 - **Gotchas:** 1M tokens is generous. EU-based provider (Paris). Good model selection including latest Qwen variants.
 
 ### 19. Novita
@@ -397,7 +397,7 @@ These providers offer free credits that expire or are one-time only.
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://novita.ai/
-- **API Key URL:** https://novita.ai/ (Dashboard)
+- **API Key URL:** https://novita.ai/settings/key-management
 - **Gotchas:** Only $0.50 but lasts a year. Very limited. Image/video generation focus.
 
 ---
