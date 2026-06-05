@@ -51,6 +51,7 @@ _LOG_STYLE: dict[EventKind, tuple[str, str]] = {
     EventKind.SKIP: ("↷", _MUTED),
     EventKind.FAIL: ("✗", f"bold {_BAD}"),
     EventKind.RETRY: ("↻", _RUN),
+    EventKind.VALIDATE: ("✓", _INFO),
     EventKind.AI_CALL: ("✦", "magenta"),
     EventKind.PROMPT: ("?", _INFO),
 }
@@ -427,6 +428,12 @@ class Dashboard:
             self.current_step = "retrying…"
             self.prompt_active = None
             self._log(event.kind, slug, event.message)
+        elif event.kind == EventKind.VALIDATE:
+            status = event.payload.get("validation_status", "")
+            # An invalid key is a failure worth flagging in red; everything else
+            # (valid / unsupported / error) uses the neutral validate style.
+            kind = EventKind.FAIL if status == "invalid" else EventKind.VALIDATE
+            self._log(kind, slug, event.message)
         elif event.kind == EventKind.AI_CALL:
             self.ai_calls += 1
             self._log(event.kind, "ai", event.message)

@@ -46,6 +46,11 @@ class HarvestResult:
     html_path: str | None = None
     user_skipped: bool = False
     notes: str | None = None
+    # Live-validation outcome (set by `harvest validate` or `run --validate`).
+    # status is one of: "valid" | "invalid" | "unsupported" | "error" | None.
+    validation_status: str | None = None
+    validation_detail: str | None = None
+    validated_at: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -63,6 +68,9 @@ class HarvestResult:
             "html_path": self.html_path,
             "user_skipped": self.user_skipped,
             "notes": self.notes,
+            "validation_status": self.validation_status,
+            "validation_detail": self.validation_detail,
+            "validated_at": self.validated_at,
         }
 
     @classmethod
@@ -121,6 +129,7 @@ class EventKind(StrEnum):
     SKIP = "skip"
     FAIL = "fail"
     RETRY = "retry"
+    VALIDATE = "validate"
     AI_CALL = "ai_call"
     PROMPT = "prompt"
     DASHBOARD_PAUSE = "dashboard_pause"

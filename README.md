@@ -67,6 +67,7 @@ harvest run --cdp-port 9222                     # attach to an existing Chrome
 harvest run --only groq,cerebras                # subset
 harvest run --skip aws-bedrock,gcp-vertex       # exclude
 harvest run --no-dashboard                      # plain-log mode for CI or recordings
+harvest run --validate                          # test-call each key right after capture
 harvest run --gemini-key sk-...                 # pre-seed Gemini, skip the AI Studio bootstrap
 harvest run --ai-model gemini-2.5-flash         # default model; --ai-budget defaults to 30
 
@@ -76,6 +77,9 @@ harvest reset                                   # forget everything
 harvest export --format md                      # re-render keys.md from keys.json
 harvest export --format env                     # re-render .env only
 harvest export                                  # all three formats
+
+harvest validate                                # test-call every stored key
+harvest validate --only groq,mistral-la-plateforme   # validate a subset
 ```
 
 If you don't pass `--gemini-key`, it reads `$GEMINI_API_KEY` or `$GOOGLE_GENERATIVE_AI_API_KEY` instead.
@@ -122,6 +126,25 @@ Files are written after every successful key, so a partial run still leaves usab
 `outputs/.env` holds `KEY=VALUE` lines using the env-var names from `providers.md`, de-duplicated on rewrite. `outputs/keys.json` holds the structured record for each provider: slug, name, tier, status, key, env var, timestamp, dashboard URL, rate limits, and notes. `outputs/keys.md` is a readable table grouped by tier, with only the last four characters of each key shown.
 
 `harvest export` re-renders any of these from `keys.json` without running the browser again.
+
+## Validating keys
+
+A captured key matches a per-provider format regex, but that only proves it
+looks right, not that it works. `harvest validate` makes one cheap authenticated
+request per provider (almost always `GET {base}/v1/models`) and records the
+outcome as `valid`, `invalid`, `unsupported`, or `error` back into `keys.json`
+and the `Valid` column of `keys.md`. It exits non-zero if any stored key fails to
+authenticate, so it fits in CI.
+
+```bash
+harvest validate                 # check every stored key
+harvest validate --only groq     # check a subset
+```
+
+Pass `harvest run --validate` to probe each key inline, right after it's
+captured, so the dashboard shows whether the key actually works before the run
+moves on. Providers without an account-agnostic probe (the cloud consoles, and a
+few with bespoke auth) report `unsupported` rather than a false failure.
 
 ## State, resume, and debugging
 
