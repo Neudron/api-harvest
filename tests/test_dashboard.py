@@ -3,9 +3,12 @@ without touching Rich Live."""
 
 from __future__ import annotations
 
+import asyncio
+
 from rich.console import Console
 
 from harvest.dashboard import Dashboard
+from harvest.events import EventBus
 from harvest.models import EventKind, ProviderSpec, StepEvent
 
 
@@ -134,3 +137,29 @@ def test_refresh_and_rich_render_do_not_raise() -> None:
     assert "api-harvest" in out
     assert "Providers" in out
     assert "Keys" in out  # footer keybinding panel present
+
+
+def test_run_loop_animates_between_events_and_tears_down_cleanly() -> None:
+    """Drive the real run() loop with a live EventBus. The animation ticker
+    fires between events (sleeps > one 0.125s tick), rendering on the asyncio
+    thread — exercising the single-threaded render path with no background
+    Rich refresh thread — and the loop must tear down cleanly when the bus
+    closes."""
+
+    async def scenario() -> Dashboard:
+        d = Dashboard(Console(width=100, height=30), [_spec("groq"), _spec("cerebras")])
+        bus = EventBus()
+        stream = bus.subscribe()
+        task = asyncio.create_task(d.run(bus, events=stream))
+        for kind in (EventKind.START, EventKind.RETRY, EventKind.SUCCESS):
+            payload = {"api_key": "gsk_abcd1234ef"} if kind == EventKind.SUCCESS else {}
+            await bus.emit(StepEvent(provider_slug="groq", kind=kind, message="x", payload=payload))
+            await asyncio.sleep(0.15)  # let _animate run at least one tick
+        await bus.close()
+        await asyncio.wait_for(task, timeout=3)
+        return d
+
+    d = asyncio.run(scenario())
+    assert d.statuses["groq"] == "done"
+    assert d.retries == 1
+    assert d._live is not None and not d._live.is_started  # stopped on teardown

@@ -42,9 +42,6 @@ _STATUS_META: dict[str, tuple[str, str, str]] = {
     "pending": ("·", _MUTED, "WAIT"),
 }
 
-# Back-compat: some callers/tests imported this mapping historically.
-_STATUS_STYLES = {k: v[1] for k, v in _STATUS_META.items()}
-
 # Per-event-kind styling for the activity log.
 _LOG_STYLE: dict[EventKind, tuple[str, str]] = {
     EventKind.START: ("▸", "cyan"),
@@ -310,14 +307,40 @@ class Dashboard:
     def __rich__(self) -> Layout:
         """Make the dashboard the Live renderable directly.
 
-        Live auto-refreshes by re-rendering this object, so the elapsed clock,
-        spinner, and progress bar animate continuously between events — not just
-        when one arrives. When the view is soft-frozen via the [p] hotkey we skip
-        the rebuild and return the last frame, leaving it static to read.
+        Rebuilt on every ``Live.refresh()``. Those refreshes are driven only
+        from the asyncio thread — by ``_animate`` on a timer and by the event
+        loop after each event — never by a Rich background thread (Live is
+        created with ``auto_refresh=False``). That keeps ``_refresh`` on the
+        same thread that mutates the state it reads, so they never race. When
+        the view is soft-frozen via the [p] hotkey we skip the rebuild and
+        return the last frame, leaving it static to read.
         """
         if not self._view_frozen:
             self._refresh()
         return self._layout
+
+    def _live_active(self) -> bool:
+        return (
+            self._live is not None
+            and self._live.is_started
+            and self.paused.is_set()
+            and not self._view_frozen
+        )
+
+    async def _animate(self) -> None:
+        """Steady ~8 fps repaint so the clock, spinner, and progress bar move
+        between events. Runs on the asyncio thread (not a Rich refresh thread),
+        so it can't race ``_apply``'s mutations of the state ``_refresh`` reads."""
+        try:
+            while True:
+                await asyncio.sleep(0.125)
+                if self._live_active():
+                    try:
+                        self._live.refresh()  # type: ignore[union-attr]
+                    except Exception:
+                        pass
+        except asyncio.CancelledError:
+            pass
 
     async def run(self, bus: EventBus, events: AsyncIterator[StepEvent] | None = None) -> None:
         # Subscribe synchronously at call time if a stream wasn't pre-supplied.
@@ -326,20 +349,33 @@ class Dashboard:
         # events emitted before a subscriber registers).
         stream = events if events is not None else bus.subscribe()
         self._refresh()
-        self._live = Live(self, console=self.console, refresh_per_second=8, screen=False)
+        # auto_refresh=False: never spin up Rich's background refresh thread, so
+        # __rich__/_refresh only runs on this asyncio thread (see _animate).
+        self._live = Live(
+            self, console=self.console, refresh_per_second=8, screen=False, auto_refresh=False
+        )
         self._live.start()
+        try:
+            self._live.refresh()  # paint the first frame
+        except Exception:
+            pass
+        ticker = asyncio.create_task(self._animate())
         try:
             async for event in stream:
                 self._apply(event)
-                # Nudge an immediate repaint so changes show without waiting for
-                # the next auto-refresh tick. __rich__ does the actual rebuild.
-                live_on = self.paused.is_set() and not self._view_frozen
-                if live_on and self._live is not None and self._live.is_started:
+                # Immediate repaint so the change shows without waiting for the
+                # next animation tick. Same thread as _animate — never concurrent.
+                if self._live_active():
                     try:
                         self._live.refresh()
                     except Exception:
                         pass
         finally:
+            ticker.cancel()
+            try:
+                await ticker
+            except asyncio.CancelledError:
+                pass
             if self._live is not None and self._live.is_started:
                 # Paint the final state before tearing Live down.
                 try:
@@ -389,6 +425,7 @@ class Dashboard:
         elif event.kind == EventKind.RETRY:
             self.retries += 1
             self.current_step = "retrying…"
+            self.prompt_active = None
             self._log(event.kind, slug, event.message)
         elif event.kind == EventKind.AI_CALL:
             self.ai_calls += 1

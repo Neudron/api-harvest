@@ -20,7 +20,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Data used for training:** Yes (outside UK/CH/EEA/EU)
 - **Signup URL:** https://aistudio.google.com
 - **API Key URL:** https://aistudio.google.com/apikey
-- **Gotchas:** Rate limits get slashed periodically. Not available in EU countries. Data may be used for model training depending on region.
+- **Gotchas:** The permanent-free tier covers Flash / Flash-Lite (and Gemma) models; Pro models are billing-gated. Rate limits get slashed periodically. Not available in EU countries. Data may be used for model training depending on region.
 
 ### 2. Groq
 
@@ -68,7 +68,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Data used for training:** No
 - **Signup URL:** https://codestral.mistral.ai
 - **API Key URL:** https://codestral.mistral.ai
-- **Gotchas:** Code-focused model only. Currently free. Monthly subscription model may change. Separate from main Mistral platform.
+- **Gotchas:** Code-focused model only. The free beta is over — Codestral is now a standard priced model on La Plateforme (legacy accounts may retain free access via the dedicated codestral.mistral.ai endpoint). Separate from the main Mistral platform.
 
 ### 6. OpenRouter
 
@@ -104,7 +104,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Data used for training:** No
 - **Signup URL:** https://vercel.com/signup
 - **API Key URL:** https://vercel.com/dashboard/~/ai-gateway
-- **Gotchas:** $5/month covers light testing only. Some Reddit users report the free credit disappeared after adding a payment method. Zero Data Retention (ZDR) costs extra. If you exceed $5, you need to enable paid tier.
+- **Gotchas:** $5/month covers light testing only. Unlocking the credit may require card / identity verification, and once you add a payment method you become a paid customer and stop receiving the free credit. Zero Data Retention (ZDR) costs extra. If you exceed $5, you need to enable paid tier.
 
 ### 9. NVIDIA NIM
 
@@ -120,7 +120,7 @@ These providers offer genuinely free API access that never expires and does not 
 
 ### 10. GitHub Models
 
-- **Free tier type:** Permanent free tier (via Copilot Free plan)
+- **Free tier type:** Permanent free tier (separate per-account daily quotas)
 - **Rate limits:** Depends on Copilot tier — Free plan: very restrictive token limits | Pro: 300 premium requests/month
 - **Free models:** GPT-4o, GPT-4.1, GPT-4.1-mini, GPT-4.1-nano, GPT-5, GPT-5-mini, GPT-5-nano, o1, o1-mini, o3, o3-mini, o4-mini, Llama 3.3 70B, Llama 4 Maverick/Scout, DeepSeek-R1/V3, Mistral Medium 3, Mistral Small 3.1, Cohere Command A/R/R+, Phi-4, Codestral, Grok 3/3 Mini, AI21 Jamba 1.5, and more
 - **Requires credit card:** No
@@ -128,7 +128,7 @@ These providers offer genuinely free API access that never expires and does not 
 - **Data used for training:** No
 - **Signup URL:** https://github.com/marketplace/models
 - **API Key URL:** https://github.com/settings/personal-access-tokens
-- **Gotchas:** Extremely restrictive input/output token limits. Uses GitHub PAT, not traditional API key. Good for prototyping only. Access depends on Copilot subscription tier.
+- **Gotchas:** Extremely restrictive input/output token limits. Uses GitHub PAT, not traditional API key. Good for prototyping only. As of June 1 2026 GitHub Copilot moved to usage-based AI Credits billing; the Models API now has its own per-account daily quotas, managed separately from any Copilot plan.
 
 ### 11. Cloudflare Workers AI
 
@@ -174,15 +174,15 @@ These providers offer free credits that expire or are one-time only.
 
 ### 1. xAI / Grok
 
-- **Trial credits:** $25/month recurring free credits
-- **Duration:** Monthly (RECURRING — resets each month!)
+- **Trial credits:** $25 one-time free credits on signup
+- **Duration:** One-time (until used up)
 - **Free models:** Grok 3, Grok 3 Mini, Grok 2
 - **Requires credit card:** No
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://console.x.ai/
 - **API Key URL:** https://console.x.ai/
-- **Gotchas:** The $150/month data-sharing program was discontinued May 2025, but the base $25/month credits remain. This is the BEST recurring credit deal available. No credit card needed — just email signup.
+- **Gotchas:** The recurring credits came from a data-sharing program that has since ended; what remains is a one-time $25 signup credit. No credit card needed — just email signup.
 
 ### 2. Alibaba/Qwen (DashScope)
 
@@ -254,7 +254,7 @@ These providers offer free credits that expire or are one-time only.
 - **Data used for training:** No
 - **Signup URL:** https://azure.microsoft.com/en-us/free/
 - **API Key URL:** https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/AppliedAIHub/~/OpenAI
-- **Gotchas:** MAJOR BLOCKER: Azure OpenAI requires separate manual access approval — not automatically granted. Free trial subscriptions are often rejected for OpenAI access. Must fill out application form explaining use case. Approval takes 1+ business days. 30-day credit expiry. CC required at signup.
+- **Gotchas:** Microsoft removed the Limited Access registration form for standard Azure OpenAI — all Azure customers are now eligible by default (no manual approval). Still needs an Azure subscription with a credit card; 30-day credit expiry. Some advanced / abuse-monitoring features remain gated.
 
 ### 8. Perplexity
 
@@ -266,7 +266,7 @@ These providers offer free credits that expire or are one-time only.
 - **Data used for training:** No
 - **Signup URL:** https://www.perplexity.ai/settings/api
 - **API Key URL:** https://www.perplexity.ai/settings/api
-- **Gotchas:** Credits are inconsistent — some users get $0, some $25, some $50. Pro subscribers ($20/mo) get $5/month in API credits. Free Perplexity accounts cannot access the API at all. Credits do not roll over.
+- **Gotchas:** Credits are inconsistent — some users get $0, some $25, some $50. The Pro ($20/mo) $5/month API credit has reportedly been withdrawn for newer subscribers — treat it as unreliable. Free Perplexity accounts cannot access the API at all. Credits do not roll over.
 
 ### 9. Fireworks AI
 
@@ -342,15 +342,15 @@ These providers offer free credits that expire or are one-time only.
 
 ### 15. Modal
 
-- **Trial credits:** $5/month recurring (or $30/month with credit card)
+- **Trial credits:** $30/month recurring credits (Starter plan, all accounts)
 - **Duration:** Monthly (RECURRING!)
 - **Free models:** Any supported model — pay by compute time
-- **Requires credit card:** No (but $30/month if you add one)
+- **Requires credit card:** No
 - **Requires phone verification:** No
 - **Data used for training:** No
 - **Signup URL:** https://modal.com/
 - **API Key URL:** https://modal.com/settings/tokens
-- **Gotchas:** $5/month recurring without CC, $30/month with CC. Serverless compute platform — you deploy and run models, pay by compute time. Good for custom inference.
+- **Gotchas:** The Starter (free) plan now grants $30/month in compute credits to all accounts by default. Serverless compute platform — you deploy and run models, pay by compute time. Good for custom inference.
 
 ### 16. Hyperbolic
 
@@ -429,7 +429,7 @@ These providers offer free credits that expire or are one-time only.
 
 - **Minimum cost:** $18/month subscription
 - **Requires credit card:** No (but subscription required)
-- **Why not free:** No free API access. Pro subscription ($18/mo) includes $10 one-time API credit. Free chat exists on website but not via API. The "free" Venice Uncensored model on OpenRouter is through OpenRouter's free tier, not Venice's own API.
+- **Why not free:** Restructured (April 2026) into four tiers (Free, Pro, Pro Plus, Max). The $18/mo Pro tier now includes API access plus a one-time $10 API credit; the Free tier is web-chat-oriented with very limited / no standalone API. Still effectively paid for sustained API use. The "free" Venice Uncensored model on OpenRouter is via OpenRouter's free tier, not Venice's own API.
 - **Signup URL:** https://venice.ai
 
 ### GitLab AI (Duo)
@@ -460,7 +460,7 @@ These providers offer free credits that expire or are one-time only.
 1. **Google Gemini** → https://aistudio.google.com/apikey → Sign in with Google → "Create API Key" → Done
 2. **Groq** → https://console.groq.com → Sign up → https://console.groq.com/keys → "Create API Key" → Done
 3. **Cerebras** → https://cloud.cerebras.ai → Sign up → Dashboard → "Create API Key" → Done
-4. **xAI/Grok** → https://console.x.ai/ → Sign up → "Create API Key" → Done ($25/month recurring!)
+4. **xAI/Grok** → https://console.x.ai/ → Sign up → "Create API Key" → Done ($25 one-time signup credit)
 5. **OpenRouter** → https://openrouter.ai → Sign up → https://openrouter.ai/settings/keys → "Create Key" → Done
 
 ---
