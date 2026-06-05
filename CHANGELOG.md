@@ -41,6 +41,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   unclickable-button failures, and CAPTCHA / Google sign-in takeover routing.
 
 ### Changed
+- **Rich dashboard redesign** (`harvest/dashboard.py`). A cohesive design system
+  (semantic success/danger/warning/info palette, cyan brand accent), status
+  badges with icons (`✓ DONE`, `◐ RUN`, `✗ FAIL`, `↷ SKIP`, `· WAIT`), a
+  tier-grouped provider table with an active-row marker and per-provider CC/SMS
+  flags, and a colour-coded activity log. The header now shows live status pills
+  plus elapsed time, AI-rescue count, and retry count. The dashboard is now the
+  Live renderable itself (`__rich__`), so the clock, spinner, and progress bar
+  animate continuously between events instead of only on each event.
+  - **`[p]` pause hotkey is now actually wired**: it previously emitted
+    `DASHBOARD_PAUSE`/`RESUME` events that `_apply` dropped, so the view never
+    froze. `_apply` now soft-freezes/unfreezes the view (without tearing down
+    Live), and the footer shows a `PAUSED` indicator.
+  - **`RETRY` events are now handled** (were silently ignored): they increment a
+    retry counter shown in the header and update the current step.
+  - The footer lists every key: `[p]` pause/resume, `[s]` skip, `[q]` quit,
+    `^C` abort.
 - **Provider API-key URLs refreshed to canonical paths** (`providers.md`). Entries
   that previously stored a bare domain plus a parenthetical note (e.g.
   `https://console.mistral.ai (API Keys section after login)`) now hold a single
