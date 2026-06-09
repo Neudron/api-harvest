@@ -275,6 +275,17 @@ def report() -> None:
 
 
 @app.command()
+def report() -> None:
+    """Write a run summary (outputs/report.md) from keys.json."""
+    config.ensure_dirs()
+    from harvest.report import build_report
+
+    report_path = config.OUTPUTS_DIR / "report.md"
+    n = build_report(config.JSON_PATH, report_path)
+    console.print(f"Wrote run summary for {n} providers to {report_path}")
+
+
+@app.command()
 def run(
     cdp_port: Annotated[int | None, typer.Option("--cdp-port", help="Attach to running Chrome via CDP")] = None,
     profile_dir: Annotated[Path | None, typer.Option("--profile-dir", help="Use a dedicated Chromium profile dir")] = None,

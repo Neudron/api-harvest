@@ -17,7 +17,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   any invalid key). Stdlib-only (`urllib.request`) so it adds no dependency, with
   an injectable opener that keeps the tests fully offline. Providers without an
   account-agnostic probe resolve to `unsupported` rather than a false failure.
-
 - **Retries with backoff** (`harvest/retry.py`): opt-in per-provider retries with
   exponential backoff. `is_retryable()` classifies transient failures
   (`HandlerError`, timeouts) vs. terminal ones (CAPTCHA, manual login, user skip,
