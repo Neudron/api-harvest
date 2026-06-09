@@ -220,4 +220,5 @@ __marimo__/
 # api-harvest runtime
 .harvest/
 outputs/
+harvest-chrome/
 

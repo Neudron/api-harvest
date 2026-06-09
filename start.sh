@@ -25,7 +25,7 @@ source .venv/bin/activate
 echo "Installing dependencies..."
 pip install -e . -q
 
-echo "Installing Playwright browser..."
+echo "Installing browser (Playwright Chromium)..."
 playwright install chromium
 
 mkdir -p ./harvest-chrome

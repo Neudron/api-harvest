@@ -16,12 +16,12 @@ for /f "tokens=1,2 delims=." %%a in ("!PYVER!") do (
     set MINOR=%%b
 )
 if !MAJOR! LSS 3 (
-    echo Error: Python 3.11+ is required (found !PYVER!).
+    echo Error: Python 3.11+ is required. Found version !PYVER!.
     pause
     exit /b 1
 )
 if !MAJOR! EQU 3 if !MINOR! LSS 11 (
-    echo Error: Python 3.11+ is required (found !PYVER!).
+    echo Error: Python 3.11+ is required. Found version !PYVER!.
     pause
     exit /b 1
 )
@@ -37,7 +37,7 @@ call .venv\Scripts\activate.bat
 echo Installing dependencies...
 pip install -e . -q
 
-echo Installing Playwright browser...
+echo Installing browser (Playwright Chromium)...
 playwright install chromium
 
 if not exist "harvest-chrome\" mkdir harvest-chrome

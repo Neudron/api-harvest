@@ -168,7 +168,7 @@ def test_validate_command_updates_keys_and_exit_code(tmp_path: Path, monkeypatch
     by_slug = {r["provider_slug"]: r for r in stored}
     assert by_slug["groq"]["validation_status"] == "valid"
     assert by_slug["cohere"]["validation_status"] == "invalid"
-    assert "✓" in (outputs / "keys.md").read_text()
+    assert "✓" in (outputs / "keys.md").read_text(encoding="utf-8")
 
 
 def test_validate_command_no_keys(tmp_path: Path, monkeypatch) -> None:

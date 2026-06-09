@@ -49,13 +49,21 @@ async def open_browser(
 
     assert profile_dir is not None
     profile_dir.mkdir(parents=True, exist_ok=True)
-    context = await pw.chromium.launch_persistent_context(
+    launch_kwargs: dict[str, Any] = dict(
         user_data_dir=str(profile_dir),
         headless=False,
-        channel="chrome",
         viewport={"width": 1400, "height": 900},
         args=["--disable-blink-features=AutomationControlled"],
     )
+    try:
+        # Prefer the user's real Google Chrome for the most realistic browsing.
+        context = await pw.chromium.launch_persistent_context(
+            channel="chrome", **launch_kwargs
+        )
+    except Exception:
+        # Google Chrome isn't installed; fall back to Playwright's bundled
+        # Chromium (installed via `playwright install chromium`, no admin needed).
+        context = await pw.chromium.launch_persistent_context(**launch_kwargs)
     return BrowserHandle(playwright=pw, browser=None, context=context, is_cdp=False)
 
 
